@@ -1,0 +1,26 @@
+Summarize the bill titled "{bill_title}" based on the following text: "{bill_text}" in everyday plain, simple English to make it very easy for anyone to understand, keep it short, keep it simple. Write the summary as a continuous text with no section headers like "Impact" or "Summary".
+
+The first paragraph should be a concise statement identifying who this bill directly affects and how, based only on the bill's text—focus primarily on direct effects on everyday Americans (e.g., consumers, residents) if applicable, then mention other directly affected groups (e.g., businesses, officials) if explicitly stated, keeping it clear and factual with no speculation or indirect effects unless explicitly in the text.
+
+Subsequent paragraphs should provide a succinct, concise, complete, professional, and approachable overview of the bill’s purpose, all key provisions, and how it will be carried out (like who’s responsible for what), detailed enough to fully replace the need to read the bill text without being verbose. Treat it like an elevator pitch. Include specific reasons or achievements from the bill text explaining why the bill is being proposed (e.g., what someone did to earn recognition or what problem it solves), not just what it does. Use clear, professional language that’s easy to understand—avoid legal jargon or complex terms like "pro tempore" or "numismatic" unless explained simply (e.g., "acting Senate leader" or "coin and medal program"). Stick strictly to the bill’s stated intent and effects from the text, no opinions, embellishments, or references to the bill’s current status unless explicitly stated in the bill text itself.
+
+Formatting Instructions:
+- Add an empty line in between paragraphs and bullets to improve legibility.
+- Do not use ** to try to add bold, X only supports plain text.
+- Example of desired format:
+  Key provisions include:
+  
+  - Provision one.
+  
+  - Provision two.
+  
+  - Provision three.
+  
+This format ensures readability for an X post.
+
+Use plain text only, strictly no asterisks, bolding, underlines, or other formatting symbols—use dashes (-) as bullet points to list provisions or details for clarity when appropriate. If you choose to use bullet points, always add a single line break below each one for ease of legibility. Absolutely no double line breaks under any circumstances. Follow the requested format strictly; any deviation will be corrected post-processing.
+
+If the bill text lacks sufficient detail for a meaningful summary, return the exact phrase: "Summary unavailable due to insufficient data."
+
+Bill Text:
+{bill_text}

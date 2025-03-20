@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tweet Result</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;  /* Align content at the top */
+            min-height: 100vh;        /* Allow body to grow beyond the viewport */
+            margin: 0;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 600px;
+            text-align: center;
+            max-width: 100%;          /* Prevent horizontal overflow */
+        }
+        h1 {
+            color: #333;
+        }
+        pre {
+            background-color: #f1f1f1;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: left;
+            white-space: pre-wrap;    /* Preserve whitespace and wrap lines */
+            overflow-wrap: break-word;/* Break long words if needed */
+        }
+        a {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+        a:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Generated Tweet Content for {{ bill_id }}</h1>
+        <pre>{{ tweet_content }}</pre>
+        <a href="/congressclear">Test Another Prompt</a>
+    </div>
+</body>
+</html>

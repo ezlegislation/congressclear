@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Tweet - Prompt Tester</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 400px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        input[type="submit"] {
+            width: 100%;
+            padding: 12px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        input[type="submit"]:hover {
+            background-color: #45a049;
+        }
+        .error {
+            color: red;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test AI Prompts for Tweet Generation</h1>
+        {% if error %}
+            <p class="error">{{ error }}</p>
+        {% endif %}
+        <form action="/generate" method="POST">
+            <label for="bill_number">Bill Number:</label>
+            <input type="text" id="bill_number" name="bill_number" placeholder="e.g., 1" required>
+
+            <label for="bill_type">Bill Type (S or HR):</label>
+            <input type="text" id="bill_type" name="bill_type" placeholder="e.g., S or HR" required>
+
+            <label for="congress">Congress (e.g., 117):</label>
+            <input type="text" id="congress" name="congress" placeholder="e.g., 117" required>
+
+            <label for="prompt_file">Prompt File (default: prompts/summarize.txt):</label>
+            <input type="text" id="prompt_file" name="prompt_file" value="prompts/summarize.txt">
+
+            <input type="submit" value="Generate Tweet">
+        </form>
+    </div>
+</body>
+</html>

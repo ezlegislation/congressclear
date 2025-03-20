@@ -1,0 +1,17 @@
+Bill Amended - {status}: {formatted_bill_type}{number} ({formatted_congress}) - {title}
+Introduced by {sponsor_name} [{sponsor_party_state}] on {introduced_date}
+
+Amendment Impact: {amendment_summary}
+
+Impact: {summary}
+
+Latest Action(s):
+{actions_list}
+
+To read the bill's initial summary, visit:
+{post_link}
+
+For more details, visit:
+{link}
+
+Source: Congress.gov

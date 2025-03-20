@@ -1,0 +1,17 @@
+Bill Amended - {status}: {formatted_bill_type}{number} ({formatted_congress}) - {title}
+Introduced by {sponsor_name} [{sponsor_party_state}] on {introduced_date}
+
+Latest Amendment(s):
+{amendments_list}
+
+Incorporation of the amendment into the bill text is not yet available.
+
+Follow @ezlegislation for updates.
+
+To read the bill's latest summary, visit:
+{post_link}
+
+For more details, visit:
+{link}
+
+Source: Congress.gov

@@ -1,0 +1,10 @@
+Bill {status}: {formatted_bill_type}{number} ({formatted_congress}) - {title}
+Introduced by {sponsor_name} [{sponsor_party_state}] on {introduced_date}
+
+Latest Action(s):
+{actions_list}
+
+For more details, visit:
+{link}
+
+Source: Congress.gov

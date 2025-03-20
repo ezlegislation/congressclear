@@ -1,0 +1,20 @@
+Bill {status}: {formatted_bill_type}{number} ({formatted_congress}) - {title}
+Introduced by {sponsor_name} [{sponsor_party_state}] on {introduced_date}
+
+{if crs_summary:
+{crs_summary}
+  
+Follow @ezlegislation for updates.
+else:
+A legislative analyst in the Congressional Research Service will begin analyzing this legislation after text becomes available.
+  
+Follow @ezlegislation for updates.
+}
+
+Latest Action(s):
+{actions_list}
+
+For more details, visit:
+{link}
+
+Source: Congress.gov

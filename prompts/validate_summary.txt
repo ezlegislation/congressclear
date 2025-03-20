@@ -1,0 +1,5 @@
+Review the following summary for quality and accuracy.
+If it contains vague phrases like 'unknown,' 'I don't know,' or lacks meaningful content, respond with 'retry.'
+Otherwise, respond with 'valid.'
+
+Summary: {summary}
