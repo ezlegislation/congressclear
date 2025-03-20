@@ -144,8 +144,12 @@ def RetroScraper():
                         tweeted_count += 1
                         bill_data['tweeted'] = 1
                         bill_data['post_id'] = str(tweet_response.data['id'])
-                        bill_data['post_ids'] = [str(tweet_response.data['id'])]
-                        bill_data['summary_post_id'] = str(tweet_response.data['id']) if 'new_bill' in template_name else None
+                        # Filter post_ids to summary tweets only
+                        post_ids = json.loads(check[5]) if check and check[5] else []
+                        if template_name in ["new_bill.txt"]:
+                            post_ids.append({"id": str(tweet_response.data['id']), "timestamp": datetime.now().isoformat()})
+                            bill_data['summary_post_id'] = str(tweet_response.data['id'])
+                        bill_data['post_ids'] = post_ids
                         bill_data['tweet_hash'] = tweet_hash
                         utils.save_bill(bill_data)
                         logging.info(f"Tweeted {bill_id}: {tweet[:100]}... - ID: {tweet_response.data['id']}")

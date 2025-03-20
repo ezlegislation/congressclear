@@ -544,37 +544,6 @@ def summarize_text(text, bill_title, status, congress, bill_type, number):
     )
     return "Summary unavailable due to insufficient data"
 
-def summarize_amendment_diff(old_text, new_text, bill_title):
-    """Summarize the amendment changes using Gemini AI with retries and validation."""
-    if not old_text or not new_text:
-        logging.info(f"No amendment summary for {bill_title}: Missing old or new text")
-        return "Amendment summary unavailable due to missing text data"
-    
-    prompt_template = load_prompt('amendment_diff.txt')
-    prompt = prompt_template.format(bill_title=bill_title, old_text=old_text, new_text=new_text)
-    last_summary = None
-    
-    for attempt in range(5):
-        try:
-            logging.info(f"Attempting amendment summary generation for {bill_title}, attempt {attempt + 1}")
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            summary = model.generate_content(prompt).text.strip()
-            logging.info(f"Raw AI amendment summary: {repr(summary)}")
-            last_summary = summary
-            if validate_summary(summary):
-                return summary
-            logging.info(f"Amendment summary validation failed, retrying attempt {attempt + 1}")
-            time.sleep(30)
-        except Exception as e:
-            logging.error(f"Amendment summary attempt {attempt + 1} failed for {bill_title}: {str(e)}")
-            time.sleep(30)
-    
-    send_email(
-        f"Amendment Summary Failure: {bill_title}",
-        f"Bill: {bill_title}\nOld Text Sample: {old_text[:100]}...\nNew Text Sample: {new_text[:100]}...\nLast Summary: {last_summary}\nError: 5 attempts failed"
-    )
-    return "Amendment summary unavailable due to insufficient data"
-
 def validate_summary(summary):
     """Validate the summary for quality using Gemini."""
     try:
@@ -611,3 +580,34 @@ def send_email(subject, body):
         logging.info(f"Email sent: {subject}")
     except Exception as e:
         logging.error(f"Failed to send email: {e}")
+
+def summarize_amendment_diff(old_text, new_text, bill_title):
+    """Summarize the amendment changes using Gemini AI with retries and validation."""
+    if not old_text or not new_text:
+        logging.info(f"No amendment summary for {bill_title}: Missing old or new text")
+        return "Amendment summary unavailable due to missing text data"
+    
+    prompt_template = load_prompt('amendment_diff.txt')
+    prompt = prompt_template.format(bill_title=bill_title, old_text=old_text, new_text=new_text)
+    last_summary = None
+    
+    for attempt in range(5):
+        try:
+            logging.info(f"Attempting amendment summary generation for {bill_title}, attempt {attempt + 1}")
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            summary = model.generate_content(prompt).text.strip()
+            logging.info(f"Raw AI amendment summary: {repr(summary)}")
+            last_summary = summary
+            if validate_summary(summary):
+                return summary
+            logging.info(f"Amendment summary validation failed, retrying attempt {attempt + 1}")
+            time.sleep(30)
+        except Exception as e:
+            logging.error(f"Amendment summary attempt {attempt + 1} failed for {bill_title}: {str(e)}")
+            time.sleep(30)
+    
+    send_email(
+        f"Amendment Summary Failure: {bill_title}",
+        f"Bill: {bill_title}\nOld Text Sample: {old_text[:100]}...\nNew Text Sample: {new_text[:100]}...\nLast Summary: {last_summary}\nError: 5 attempts failed"
+    )
+    return "Amendment summary unavailable due to insufficient data"
