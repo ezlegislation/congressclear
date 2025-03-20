@@ -1,10 +1,9 @@
-Bills To Be Considered This Week - {week_date} ({congress_session} Congress)
-The House is reviewing these bills on the floor:
+Bills To Be Considered This Week on the House Floor - {week_date} ({congress_session} Congress)
 
 {suspension_section}
 
 {rule_section}
 
-Full schedule: https://docs.house.gov/floor/
+Schedule subject to change. For the latest schedule, visit: {schedule_link}
 
 Source: Congress.gov
