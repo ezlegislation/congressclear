@@ -636,3 +636,24 @@ def get_current_congress():
     congress_start_year = 1789  # First Congress
     congress_number = 1 + ((year - congress_start_year) // 2)
     return str(congress_number)  # Return as string for consistency with API calls
+
+def fetch_bill_details(bill_id, api_key):
+    """Fetch bill details from the Congress API."""
+    CONGRESS = "119"  # Current session, can be made dynamic later
+    bill_type = bill_id.split('.')[0].lower().replace("h.r.", "hr").replace("s.", "s")
+    bill_number = bill_id.split('.')[1]
+    url = f"https://api.congress.gov/v3/bill/{CONGRESS}/{bill_type}/{bill_number}?api_key={api_key}"
+    data = fetch_api_data(url)
+    if not data or "bill" not in data:
+        logging.warning(f"Failed to fetch details for {bill_id}")
+        return None
+    bill = data["bill"]
+    return {
+        "bill_id": bill_id,
+        "title": bill.get("title", "Unknown Title"),
+        "sponsor": f"{bill.get('sponsor', {}).get('name', 'Unknown Sponsor')} [{bill.get('sponsor', {}).get('party', '')}-{bill.get('sponsor', {}).get('state', '')}]",
+        "introduced_date": bill.get("introducedDate", "Unknown Date"),
+        "congress": CONGRESS + "th",
+        "status": bill.get("latestAction", {}).get("text", "Unknown Status"),
+        "text": bill.get("text", {}).get("content", "No text available")
+    }

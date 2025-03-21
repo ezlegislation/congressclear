@@ -60,12 +60,12 @@ def OngoingScraper():
                 continue
 
             bill_number = number.split('.')[1] if '.' in number else number
-            bill_data = utils.fetch_bill_data(congress, bill_type, bill_number)
+            bill_id = f"{bill_type.upper()}.{bill_number}"
+            bill_data = utils.fetch_bill_details(bill_id, utils.congress_api_key)
             if not bill_data:
                 logging.info(f"Skipping {bill_title} - Invalid bill data")
                 continue
 
-            bill_id = f"{bill_type.upper()}.{bill_number}"
             check = utils.check_bill(bill_data['title'], bill_data['status'])
             tweeted = check[0] if check else 0
             old_text_hash = check[1] if check else None

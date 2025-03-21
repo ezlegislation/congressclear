@@ -1,4 +1,4 @@
-The bills listed below were updated in the past week. Provide a summary in everyday plain English for a general audience, including two distinct sections: 'Overview' and 'Bills'. For 'Overview', write a concise 1-2 sentence introduction explaining that this is a weekly update of recent legislative changes, focusing on their combined purpose and impact on everyday Americans (e.g., consumers, residents). For 'Bills', list each bill with a 1-2 sentence summary of its main purpose and direct impact, based only on the provided text—keep it clear, factual, and free of speculation, mentioning other affected groups (e.g., businesses, officials) if explicitly stated. Use clear, professional language that’s easy to understand—avoid legal jargon or complex terms unless explained simply (e.g., "helps families" instead of "allocates resources"). Ensure readability for an X post with natural line breaks between bills. Use plain text only, strictly no asterisks, bolding, underlines, or other formatting symbols—use dashes (-) for clarity if needed; any deviation will be corrected post-processing.
+Summarize the following bill text in 1-2 sentences, focusing on its main purpose and key provisions. Use clear, professional language that’s easy to understand—avoid legal jargon or complex terms unless explained simply. Keep it factual and free of speculation.
 
-Bill Texts:
-{bill_texts}  # Format: "Title: {title}, Text: {text}" for each bill
+Bill Text:
+{bill_text}
