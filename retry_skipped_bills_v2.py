@@ -1,4 +1,3 @@
-# had to create a v2 due to caching issues constantly calling old file and code
 import sqlite3
 import logging
 import time
@@ -6,7 +5,7 @@ import hashlib
 from datetime import datetime
 import utils
 
-# Clear any existing handlers to avoid conflicts
+# Clear existing handlers to avoid conflicts
 logging.getLogger('').handlers = []
 logging.basicConfig(
     level=logging.INFO,
