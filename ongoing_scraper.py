@@ -9,23 +9,13 @@ import hashlib
 utils.setup_logging('/home/srrdx9mw12tk/congressclear/ongoing_scraper.log')
 client = utils.get_tweepy_client()
 
-def get_current_congress():
-    """Determine the current Congress based on the date."""
-    now = datetime.now()
-    year = now.year
-    if now.month < 3 or (now.month == 3 and now.day < 3):
-        year -= 1  # If before March 3rd, use the previous term
-    congress_start_year = 1789  # First Congress
-    congress_number = 1 + ((year - congress_start_year) // 2)
-    return congress_number
-
 def OngoingScraper():
     if not os.path.exists("/home/srrdx9mw12tk/congressclear/retro_complete.txt"):
         logging.info("Retro mode not complete - exiting")
         exit(0)
 
     utils.init_db()
-    congress = str(get_current_congress())
+    congress = utils.get_current_congress()  # Use utils.get_current_congress()
     while True:
         skipped_results = utils.retry_skipped_bills()
         

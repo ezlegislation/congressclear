@@ -611,3 +611,28 @@ def summarize_amendment_diff(old_text, new_text, bill_title):
         f"Bill: {bill_title}\nOld Text Sample: {old_text[:100]}...\nNew Text Sample: {new_text[:100]}...\nLast Summary: {last_summary}\nError: 5 attempts failed"
     )
     return "Amendment summary unavailable due to insufficient data"
+
+def load_template(template_name):
+    """
+    Load a template file from the templates/ directory.
+    
+    :param template_name: Name of the template file (e.g., 'monday_post.txt')
+    :return: The content of the template file as a string, or None if not found
+    """
+    template_path = os.path.join('/home/srrdx9mw12tk/congressclear/templates', template_name)
+    try:
+        with open(template_path, 'r') as file:
+            return file.read()
+    except FileNotFoundError:
+        logging.error(f"Template file '{template_path}' not found.")
+        return None
+
+def get_current_congress():
+    """Determine the current Congress based on the date, using January 3rd as the cutoff."""
+    now = datetime.now()
+    year = now.year
+    if now.month == 1 and now.day < 3:  # Before January 3rd, use previous term
+        year -= 1
+    congress_start_year = 1789  # First Congress
+    congress_number = 1 + ((year - congress_start_year) // 2)
+    return str(congress_number)  # Return as string for consistency with API calls
