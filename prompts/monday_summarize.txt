@@ -1,4 +1,4 @@
-Summarize the following bill text in 1-2 sentences, focusing on its main purpose and key provisions. Use clear, professional language that’s easy to understand—avoid legal jargon or complex terms unless explained simply. Keep it factual and free of speculation.
+Summarize the following bill text in 1 sentence, focusing on its main purpose and key provisions. Use clear, professional language that’s easy to understand—avoid legal jargon or complex terms unless explained simply. Keep it factual and free of speculation.
 
 Bill Text:
 {bill_text}

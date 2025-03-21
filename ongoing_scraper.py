@@ -9,13 +9,23 @@ import hashlib
 utils.setup_logging('/home/srrdx9mw12tk/congressclear/ongoing_scraper.log')
 client = utils.get_tweepy_client()
 
+def get_current_congress():
+    """Determine the current Congress based on the date."""
+    now = datetime.now()
+    year = now.year
+    if now.month < 3 or (now.month == 3 and now.day < 3):
+        year -= 1  # If before March 3rd, use the previous term
+    congress_start_year = 1789  # First Congress
+    congress_number = 1 + ((year - congress_start_year) // 2)
+    return congress_number
+
 def OngoingScraper():
     if not os.path.exists("/home/srrdx9mw12tk/congressclear/retro_complete.txt"):
         logging.info("Retro mode not complete - exiting")
         exit(0)
 
     utils.init_db()
-    congress = utils.get_current_congress()  # Use utils.get_current_congress()
+    congress = str(get_current_congress())
     while True:
         skipped_results = utils.retry_skipped_bills()
         
@@ -60,41 +70,36 @@ def OngoingScraper():
                 continue
 
             bill_number = number.split('.')[1] if '.' in number else number
-            bill_id = f"{bill_type.upper()}.{bill_number}"
-            bill_data = utils.fetch_bill_details(bill_id, utils.congress_api_key)
+            bill_data = utils.fetch_bill_data(congress, bill_type, bill_number)
             if not bill_data:
                 logging.info(f"Skipping {bill_title} - Invalid bill data")
                 continue
 
+            bill_id = f"{bill_type.upper()}.{bill_number}"
             check = utils.check_bill(bill_data['title'], bill_data['status'])
             tweeted = check[0] if check else 0
             old_text_hash = check[1] if check else None
+            old_actions = json.loads(check[2]) if check and check[2] else []
             old_amendments = json.loads(check[3]) if check and check[3] else []
             text_hash = bill_data['text_hash']
 
+            # Debug logging
             logging.info(f"{bill_id} - Tweeted from check: {tweeted}, Bill data tweeted: {bill_data.get('tweeted')}")
 
             daily_limit = 50 if datetime.now() < datetime(2025, 3, 22) else 17
             tweeted_count, last_reset = utils.handle_rate_limit(tweeted_count, last_reset, daily_limit)
 
             if tweeted:
-                if old_text_hash != text_hash and bill_data['text']:
+                if old_text_hash != text_hash:
                     template_name = "amendment_summary.txt"
-                    summary = utils.summarize_text(bill_data['text'], bill_data['title'], bill_data['status'], congress, bill_type, bill_number)
-                    bill_data['summary'] = utils.clean_summary(summary) if summary else None
-                    old_text = check[5] if check and check[5] else ""  # last_text from DB
-                    amendment_summary = utils.summarize_amendment_diff(old_text, bill_data['text'], bill_data['title'])
-                    bill_data['amendment_summary'] = utils.clean_summary(amendment_summary) if amendment_summary else None
+                    if bill_data['text']:
+                        summary = utils.summarize_text(bill_data['text'], bill_data['title'], bill_data['status'], congress, bill_type, bill_number)
+                        bill_data['summary'] = utils.clean_summary(summary) if summary else None
+                    else:
+                        bill_data['summary'] = None
+                        template_name = "no_text_available.txt"
                 elif len(bill_data['amendments']) > len(old_amendments):
                     template_name = "amendment.txt"
-                    # Filter new amendments since last tweet
-                    old_amendment_numbers = {a['number'] for a in old_amendments}
-                    new_amendments = [a for a in bill_data['amendments'] if a['number'] not in old_amendment_numbers]
-                    amendments_list = "\n".join(
-                        f"{utils.format_date(a.get('latestAction', {}).get('actionDate', 'Unknown'))} - Amendment {a['number']} added"
-                        for a in sorted(new_amendments, key=lambda x: x.get('latestAction', {}).get('actionDate', ''), reverse=True)
-                    ) or "No new amendments"
-                    bill_data['amendments_list'] = amendments_list
                     bill_data['summary'] = ""
                 else:
                     logging.info(f"Skipping {bill_id} - No significant updates")
@@ -108,9 +113,7 @@ def OngoingScraper():
                     if not bill_data['summary']:
                         template_name = "no_text_available.txt"
 
-            # Set post_link to summary_post_id (latest summary tweet)
-            bill_data['post_link'] = f"https://x.com/ezlegislation/status/{check[4]}" if check and check[4] else "No summary available yet"
-
+            # Process tweet with hashtags in utils.process_template
             hashtags = " ".join(utils.get_hashtags(bill_data['text'] or bill_data['crs_summary'] or '', bill_data['sponsor_party_state'].split('-')[1]))
             tweet = utils.process_template(utils.load_tweet_template(template_name), bill_data, hashtags=hashtags)
             tweet_hash = hashlib.md5(tweet.encode()).hexdigest()
@@ -125,16 +128,13 @@ def OngoingScraper():
                 tweeted_count += 1
                 bill_data['tweeted'] = 1
                 bill_data['post_id'] = str(tweet_response.data['id'])
-                # Filter post_ids to summary tweets only
-                post_ids = json.loads(check[5]) if check and check[5] else []
-                if template_name in ["new_bill.txt", "amendment_summary.txt"]:
-                    post_ids.append({"id": str(tweet_response.data['id']), "timestamp": datetime.now().isoformat()})
-                    bill_data['summary_post_id'] = str(tweet_response.data['id'])
-                bill_data['post_ids'] = post_ids
+                bill_data['post_ids'] = [str(tweet_response.data['id'])] if not check else json.loads(check[5]) + [str(tweet_response.data['id'])]
+                bill_data['summary_post_id'] = str(tweet_response.data['id']) if 'summary' in template_name else (check[5][0] if check else None)
                 bill_data['tweet_hash'] = tweet_hash
                 utils.save_bill(bill_data)
                 logging.info(f"Tweeted {bill_id}: {tweet[:100]}... - ID: {tweet_response.data['id']}")
                 utils.save_tweet_count(tweeted_count, last_reset)
+                # Adjust sleep time: 30 min before March 23, 2025, 60 min after
                 sleep_time = 1800 if datetime.now() < datetime(2025, 3, 23) else 3600
                 time.sleep(sleep_time)
             except tweepy.TweepyException as e:

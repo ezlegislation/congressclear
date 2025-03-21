@@ -144,6 +144,17 @@ def fetch_with_retries(url, max_retries=3):
     logging.error(f"Max retries reached for {url}")
     return None
 
+def fetch_api_data(url):
+    """Fetch JSON data from an API with retries."""
+    response = fetch_with_retries(url)
+    if response:
+        try:
+            return response.json()
+        except json.JSONDecodeError as e:
+            logging.error(f"JSON decode error for {url}: {e}")
+            return None
+    return None
+
 def extract_all_text(element):
     text = element.text or ''
     for child in element:
@@ -638,22 +649,82 @@ def get_current_congress():
     return str(congress_number)  # Return as string for consistency with API calls
 
 def fetch_bill_details(bill_id, api_key):
-    """Fetch bill details from the Congress API."""
-    CONGRESS = "119"  # Current session, can be made dynamic later
-    bill_type = bill_id.split('.')[0].lower().replace("h.r.", "hr").replace("s.", "s")
-    bill_number = bill_id.split('.')[1]
-    url = f"https://api.congress.gov/v3/bill/{CONGRESS}/{bill_type}/{bill_number}?api_key={api_key}"
+    """Fetch bill details from the Congress API, matching retro and ongoing scraper logic."""
+    congress = get_current_congress()
+    bill_id = bill_id.strip()
+    if "H.J. Res." in bill_id:
+        bill_type = "hjres"
+        bill_number = bill_id.replace("H.J. Res.", "").strip()
+    elif "S.J. Res." in bill_id:
+        bill_type = "sjres"
+        bill_number = bill_id.replace("S.J. Res.", "").strip()
+    elif "H.R." in bill_id:
+        bill_type = "hr"
+        bill_number = bill_id.replace("H.R.", "").strip()
+    elif "S." in bill_id:
+        bill_type = "s"
+        bill_number = bill_id.replace("S.", "").strip()
+    else:
+        logging.warning(f"Invalid bill_id format: {bill_id}")
+        return None
+    
+    # Fetch sponsor
+    sponsor = fetch_sponsor(congress, bill_type, bill_number)
+    if not sponsor:
+        logging.info(f"Skipping {bill_id} - No sponsor data")
+        return None
+    
+    # Fetch bill data
+    url = f"https://api.congress.gov/v3/bill/{congress}/{bill_type}/{bill_number}?api_key={api_key}"
     data = fetch_api_data(url)
     if not data or "bill" not in data:
         logging.warning(f"Failed to fetch details for {bill_id}")
         return None
     bill = data["bill"]
+    
+    # Fetch actions and text
+    actions = fetch_bill_actions(congress, bill_type, bill_number)
+    bill_text = fetch_bill_text(congress, bill_type, bill_number) or "No text available"
+    
     return {
         "bill_id": bill_id,
         "title": bill.get("title", "Unknown Title"),
-        "sponsor": f"{bill.get('sponsor', {}).get('name', 'Unknown Sponsor')} [{bill.get('sponsor', {}).get('party', '')}-{bill.get('sponsor', {}).get('state', '')}]",
-        "introduced_date": bill.get("introducedDate", "Unknown Date"),
-        "congress": CONGRESS + "th",
-        "status": bill.get("latestAction", {}).get("text", "Unknown Status"),
-        "text": bill.get("text", {}).get("content", "No text available")
+        "sponsor_name": sponsor["name"],
+        "sponsor_party_state": sponsor["party_state"],
+        "introduced_date": format_date(bill.get("introducedDate", "Unknown Date")),
+        "congress": congress,
+        "formatted_congress": format_congress(congress),
+        "status": determine_status(actions),
+        "text": bill_text,
+        "link": format_bill_link(congress, bill_type, bill_number)
     }
+
+def summarize_text_concise(text, bill_title, status, congress, bill_type, number, prompt):
+    """Generate a concise summary using a custom prompt."""
+    if not text or len(text) < 30:
+        logging.info(f"No summary for {bill_type.upper()}.{number}: Text too short or empty")
+        return "Summary unavailable due to insufficient data"
+    
+    prompt = prompt.format(bill_title=bill_title, bill_text=text)
+    last_summary = None
+    
+    for attempt in range(5):
+        try:
+            logging.info(f"Attempting summary generation for {bill_type.upper()}.{number}, attempt {attempt + 1}")
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            summary = model.generate_content(prompt).text.strip()
+            logging.info(f"Raw AI summary: {repr(summary)}")
+            last_summary = summary
+            if validate_summary(summary):
+                return summary
+            logging.info(f"Summary validation failed, retrying attempt {attempt + 1}")
+            time.sleep(30)
+        except Exception as e:
+            logging.error(f"Summary attempt {attempt + 1} failed for {bill_type.upper()}.{number}: {str(e)}")
+            time.sleep(30)
+    
+    send_email(
+        f"Summary Failure: {bill_title} ({congress}/{bill_type}/{number})",
+        f"Bill: {bill_type.upper()}.{number}\nText Sample: {text[:100]}...\nLast Summary: {last_summary}\nError: 5 attempts failed"
+    )
+    return "Summary unavailable due to insufficient data"
