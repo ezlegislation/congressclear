@@ -1,180 +1,146 @@
-import feedparser
-import requests
-from bs4 import BeautifulSoup
-from datetime import datetime, timedelta
+import os
 import logging
-import time
+import utils
+from datetime import datetime, timedelta
+import feedparser
+from bs4 import BeautifulSoup
 import sqlite3
-from utils import load_config, fetch_bill_details, summarize_text_concise, DB_PATH, get_tweepy_client
-from urllib.parse import urlparse, parse_qs
+import json
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+utils.configure_logging(os.path.join(utils.BASE_PATH, 'monday_summary.log'))
 
-config = load_config()
-CONGRESS_API_KEY = config.get("congress_api_key")
-GEMINI_API_KEY = config.get("gemini_api_key")
-TWITTER_HANDLE = config.get("twitter_handle")
+def get_previous_monday():
+    today = datetime.now().date()
+    days_since_monday = today.weekday()
+    if days_since_monday == 0:  # If today is Monday
+        previous_monday = today - timedelta(days=7)
+    else:
+        previous_monday = today - timedelta(days=days_since_monday)
+    return previous_monday
 
-if not all([CONGRESS_API_KEY, GEMINI_API_KEY, TWITTER_HANDLE]):
-    logging.error("Missing required config values in config.json.")
-    exit(1)
-
-RSS_URL = "https://docs.house.gov/BillsThisWeek-RSS.xml"
-
-def fetch_with_retries(url, max_retries=3, delay=5):
-    for attempt in range(max_retries):
+def get_latest_entry_for_week(entries, monday_date):
+    for entry in entries:
         try:
-            response = requests.get(url, timeout=30)
-            if response.status_code == 200:
-                return response
-            logging.warning(f"Attempt {attempt + 1}: Received status {response.status_code}")
-        except requests.exceptions.Timeout:
-            logging.warning(f"Attempt {attempt + 1}: Request timed out")
-        time.sleep(delay)
+            pub_date = datetime.strptime(entry.published, '%a, %d %b %Y %H:%M:%S %z')
+            if pub_date.date() >= monday_date:
+                return entry
+        except ValueError:
+            logging.error(f"Failed to parse date: {entry.published}")
+            continue
     return None
 
-def get_current_monday():
-    today = datetime.now()
-    monday = today - timedelta(days=today.weekday())
-    return monday.strftime("%b %d, %Y"), monday.strftime("%Y-%m-%d")  # "Mar 24, 2025", "2025-03-24"
-
-def get_latest_entry_for_week(feed, week_start_date):
-    week_entries = []
-    for entry in feed.entries:
-        url = entry.link
-        parsed = urlparse(url)
-        query_params = parse_qs(parsed.query)
-        entry_date = query_params.get('date', [None])[0]
-        if entry_date == week_start_date:
-            week_entries.append(entry)
-    if not week_entries:
-        logging.info("No entries for this week.")
-        return None
-    latest = sorted(week_entries, key=lambda x: x.updated, reverse=True)[0]
-    logging.info(f"Latest entry found: {latest.title}")
-    return latest
-
 def parse_rss_entry(entry):
-    soup = BeautifulSoup(entry.content[0].value, "html.parser")
-    classifications = {}
-    current_classification = None
-    for element in soup.find_all(["h3", "table"]):
-        if element.name == "h3":
-            current_classification = "suspension" if "suspension" in element.text.lower() else "rule"
-            classifications[current_classification] = []
-        elif element.name == "table" and current_classification:
-            for row in element.find_all("tr", class_="floorItem"):
-                cells = row.find_all("td")
-                if len(cells) >= 2:
-                    bill_number = cells[0].text.strip()
-                    classifications[current_classification].append(bill_number)
-    return classifications
+    soup = BeautifulSoup(entry.content[0].value, 'html.parser')
+    bills = []
+    current_category = None
+    for element in soup.find_all(['h3', 'td']):
+        if element.name == 'h3':
+            if 'Suspension' in element.text:
+                current_category = 'Items under suspension of rules'
+            elif 'Rule' in element.text:
+                current_category = 'Items pursuant to a rule'
+            else:
+                current_category = None
+        elif element.name == 'td' and current_category:
+            bill_id = element.text.strip()
+            if bill_id.startswith(('H.R.', 'S.', 'H.J.Res.', 'S.J.Res.')):
+                attempt = 0
+                max_attempts = 3
+                bill_details = None
+                while attempt < max_attempts:
+                    bill_details = utils.fetch_bill_details(bill_id, utils.congress_api_key)
+                    if bill_details and all(key in bill_details for key in ['title', 'sponsor_name', 'introduced_date', 'link']):
+                        break
+                    attempt += 1
+                    logging.warning(f"Retry {attempt}/{max_attempts} for {bill_id} - incomplete or failed fetch")
+                    time.sleep(30)  # 30-second delay
+                if not bill_details or not all(key in bill_details for key in ['title', 'sponsor_name', 'introduced_date', 'link']):
+                    logging.error(f"Failed to fetch complete details for {bill_id} after {max_attempts} attempts")
+                    continue
+                summary = utils.summarize_text_concise(bill_details['text'], bill_details['title'], bill_details['status'], bill_details['congress'], bill_details['bill_type'], bill_details['number'], utils.load_prompt('monday_summarize.txt'))
+                bills.append((current_category, bill_id, bill_details, summary))
+    return bills
 
-def generate_summary(bill_details):
-    with open("prompts/monday_summarize.txt", "r") as f:
-        prompt = f.read()
-    bill_text = bill_details["text"]
-    bill_title = bill_details["title"]
-    status = bill_details["status"]
-    congress = bill_details["congress"]
-    bill_id = bill_details["bill_id"]
-    bill_type = bill_id.split('.')[0].lower().replace("h.r.", "hr").replace("s.", "s")
-    bill_number = bill_id.split('.')[1]
-    return summarize_text_concise(bill_text, bill_title, status, congress, bill_type, bill_number, prompt)
+def fetch_previous_tweets():
+    with sqlite3.connect(utils.utils.DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute("SELECT post_id FROM bills WHERE post_id IS NOT NULL AND summary_post_id IS NOT NULL")
+        return [row[0] for row in c.fetchall()]
 
-def format_bill(bill_details, summary, summary_post_id):
-    bill_id = bill_details["bill_id"]
-    title = bill_details["title"]
-    sponsor_name = bill_details["sponsor_name"]
-    sponsor_party_state = bill_details["sponsor_party_state"]
-    introduced_date = bill_details["introduced_date"]
-    congress = bill_details["formatted_congress"]
-    link = bill_details["link"]
-
-    bill_str = f"{bill_id} ({congress}) - {title}\n"
-    bill_str += f"Introduced by {sponsor_name} [{sponsor_party_state}] on {introduced_date}\n\n"
-    if summary:
-        bill_str += f"{summary}\n\n"
-    if summary_post_id:
-        bill_str += f"To read a summary of the bill, visit: https://x.com/{TWITTER_HANDLE}/status/{summary_post_id}\n"
-    else:
-        bill_str += f"For more details, visit: {link}\n"
-    return bill_str
-
-def get_summary_post_id(bill_id):
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT summary_post_id FROM bills WHERE bill_id = ?", (bill_id,))
-        result = cursor.fetchone()
-        conn.close()
-        return result[0] if result else None
-    except sqlite3.Error as e:
-        logging.error(f"Database error fetching summary_post_id for {bill_id}: {e}")
-        return None
+def save_to_db(bills, monday_date):
+    with sqlite3.connect(utils.utils.DB_PATH) as conn:
+        c = conn.cursor()
+        for _, bill_id, bill_details, summary in bills:
+            c.execute("""
+                INSERT OR REPLACE INTO bills 
+                (title, status, tweeted, last_checked, summary, bill_id, congress)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                bill_details['title'], 
+                bill_details['status'], 
+                1,  # tweeted
+                datetime.now().isoformat(), 
+                summary, 
+                bill_id,
+                bill_details['congress']
+            ))
+        conn.commit()
 
 def main():
-    formatted_week_start_date, week_start_date = get_current_monday()
+    previous_monday = get_previous_monday()
+    logging.info(f"Generating summary for week starting {previous_monday}")
 
-    rss_response = fetch_with_retries(RSS_URL)
-    if not rss_response:
-        logging.error("Failed to fetch RSS feed.")
-        print("Failed to fetch RSS feed.")
+    rss_url = 'https://docs.house.gov/BillsThisWeek-RSS.xml'
+    feed = utils.fetch_with_retries(rss_url)
+    if not feed:
+        logging.error("Failed to fetch RSS feed")
         return
-    print("RSS feed fetched successfully.")
 
-    feed = feedparser.parse(rss_response.content)
-    print(f"Number of entries in feed: {len(feed.entries)}")
-
-    latest_entry = get_latest_entry_for_week(feed, week_start_date)
+    entries = feedparser.parse(feed.content).entries
+    latest_entry = get_latest_entry_for_week(entries, previous_monday)
     if not latest_entry:
-        print("No latest entry found for the week.")
+        logging.info("No latest entry found for this week")
         return
-    print(f"Latest entry: {latest_entry.title}")
 
-    classifications = parse_rss_entry(latest_entry)
-    print("Classifications:", classifications)
+    bills = parse_rss_entry(latest_entry)
+    if not bills:
+        logging.info("No bills found in latest entry")
+        return
 
-    output = f"Bills To Be Considered This Week on the House Floor - {formatted_week_start_date} (119th Congress)\n\n"
-    valid_categories = [(cls, bills) for cls, bills in classifications.items() if any(bills)]
-    
-    for i, (classification, bills) in enumerate(valid_categories):
-        filtered_bills = [bill for bill in bills if bill]
-        if classification == "suspension":
-            output += "Items under suspension of rules:\n\n"
-        else:
-            output += "Items pursuant to a rule:\n\n"
-        for j, bill_id in enumerate(filtered_bills):
-            print(f"Processing bill: {bill_id}")
-            bill_details = fetch_bill_details(bill_id, CONGRESS_API_KEY)
-            if not bill_details:
-                print(f"Failed to fetch details for {bill_id}")
-                continue
-            summary = generate_summary(bill_details)
-            summary_post_id = get_summary_post_id(bill_id)
-            bill_str = format_bill(bill_details, summary, summary_post_id)
-            output += bill_str
-            if j < len(filtered_bills) - 1:  # Separator between bills
-                output += "\n-\n\n"
-        if i < len(valid_categories) - 1:  # Separator between categories
-            output += "\n==\n\n"
-    
-    schedule_link = f"https://docs.house.gov/floor/Default.aspx?date={week_start_date}"
-    output += f"\n==\n\nSchedule subject to change. For the latest schedule, visit: {schedule_link}\n"
-    output += "Source: Congress.gov\n"
+    tweet_text = f"House Floor Summary for week of {previous_monday.strftime('%b %-d, %Y')}:\n\n"
+    for category, bill_id, bill_details, summary in bills:
+        tweet_text += f"[{bill_id}] ({bill_details['congress']}) - {bill_details['title']}\n"
+        tweet_text += f"Introduced by {bill_details['sponsor_name']} [{bill_details['sponsor_party_state']}] on {bill_details['introduced_date']}\n"
+        tweet_text += f"{summary}\n"
+        tweet_text += f"For more details, visit: {bill_details['link']}\n\n"
+        if category == 'Items under suspension of rules':
+            tweet_text += "-\n"
+        elif category == 'Items pursuant to a rule':
+            tweet_text += "==\n"
+    tweet_text += f"Schedule: https://docs.house.gov/floor/\nSource: Congress.gov"
 
-    print(output)
-    logging.info(output)
+    if len(tweet_text) > 280:
+        logging.warning(f"Tweet exceeds 280 characters: {len(tweet_text)}. Truncating...")
+        tweet_text = tweet_text[:277] + "..."
 
-    # Tweet the summary
-    client = get_tweepy_client()
-    try:
-        tweet_response = client.create_tweet(text=output)
-        logging.info(f"Tweeted summary successfully: Tweet ID {tweet_response.data['id']}")
-        print(f"Tweeted summary: https://x.com/{TWITTER_HANDLE}/status/{tweet_response.data['id']}")
-    except Exception as e:
-        logging.error(f"Failed to tweet summary: {e}")
-        print(f"Failed to tweet summary: {e}")
+    formatted_tweet = utils.format_tweet(tweet_text, {}, is_summary=True)
+    if formatted_tweet:
+        logging.info(f"Tweet before posting: {formatted_tweet}")
+        tweet_id = utils.post_tweet(formatted_tweet)
+        logging.info(f"Tweeted summary: {formatted_tweet[:100]}... - ID: {tweet_id}")
+        
+        save_to_db(bills, previous_monday)
+        
+        previous_tweets = fetch_previous_tweets()
+        for old_tweet_id in previous_tweets:
+            try:
+                client = utils.get_tweepy_client()
+                client.delete_tweet(old_tweet_id)
+                logging.info(f"Deleted previous tweet ID: {old_tweet_id}")
+            except Exception as e:
+                logging.error(f"Failed to delete tweet ID: {old_tweet_id}: {str(e)}")
+    else:
+        logging.error("Failed to format Monday summary tweet")
 
 if __name__ == "__main__":
     main()

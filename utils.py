@@ -1,3 +1,4 @@
+import os
 import requests
 import sqlite3
 import json
@@ -20,21 +21,24 @@ def setup_logging(filename):
                         format='%(asctime)s %(levelname)s: %(message)s')
 
 # Initial logging setup for utils.py
-setup_logging('/home/srrdx9mw12tk/congressclear/scraper.log')
+setup_logging(os.path.join(BASE_PATH, 'scraper.log'))
 
 # Determine database path based on the presence of test_mode.txt
-if os.path.exists('/home/srrdx9mw12tk/congressclear/test_mode.txt'):
-    DB_PATH = '/home/srrdx9mw12tk/congressclear/test.db'  # Testing database
+if os.path.exists(os.path.join(BASE_PATH, 'test_mode.txt')):
+    DB_PATH = os.path.join(BASE_PATH, 'test.db')  # Testing database
     logging.info("Test mode enabled: Using test.db")
 else:
-    DB_PATH = '/home/srrdx9mw12tk/congressclear/congress.db'  # Production database
+    DB_PATH = os.path.join(BASE_PATH, 'congress.db')  # Production database
     logging.info("Production mode: Using congress.db")
 
 # Load config function
 def load_config():
     """Load the configuration from config.json."""
-    with open('/home/srrdx9mw12tk/congressclear/config.json', 'r') as f:
+    CONFIG_PATH = CONFIG_PATH
+    with open(CONFIG_PATH, 'r') as f:
         return json.load(f)
+    BASE_PATH = config["base_path"]
+    CONGRESS_API_BASE_URL = config["congress_api_base_url"]
 
 config = load_config()
 congress_api_key = config["congress_api_key"]
@@ -44,7 +48,7 @@ email_to = config["email_to"]
 sendgrid_api_key = config["sendgrid_api_key"]
 
 # Load hashtag configuration
-with open('/home/srrdx9mw12tk/congressclear/hashtags.json', 'r') as f:
+with open(os.path.join(BASE_PATH, 'hashtags.json'), 'r') as f:
     hashtag_config = json.load(f)
 HASHTAG_POOL = hashtag_config["subjects"]
 STATE_HASHTAGS = hashtag_config["states"]
@@ -88,7 +92,7 @@ def get_tweepy_client():
                 raise
 
 # Tweet count management
-tweet_count_file = "/home/srrdx9mw12tk/congressclear/tweet_count.json"
+tweet_count_file = os.path.join(BASE_PATH, config["tweet_count_file"])
 
 def load_tweet_count():
     """Load the tweet count and last reset date from the tweet_count.json file."""
@@ -176,7 +180,7 @@ def clean_summary(summary):
     return summary
 
 def fetch_bill_text(congress, bill_type, number):
-    url = f"https://api.congress.gov/v3/bill/{congress}/{bill_type}/{number}/text?api_key={congress_api_key}&format=json"
+    url = f"{CONGRESS_API_BASE_URL}bill/{congress}/{bill_type}/{number}/text?api_key={congress_api_key}&format=json"
     logging.info(f"Fetching text metadata: {url}")
     response = fetch_with_retries(url)
     if response:
@@ -211,7 +215,7 @@ def fetch_bill_text(congress, bill_type, number):
     return None
 
 def fetch_sponsor(congress, bill_type, number):
-    url = f"https://api.congress.gov/v3/bill/{congress}/{bill_type}/{number}?api_key={congress_api_key}&format=json"
+    url = f"{CONGRESS_API_BASE_URL}bill/{congress}/{bill_type}/{number}?api_key={congress_api_key}&format=json"
     response = fetch_with_retries(url)
     if response:
         try:
@@ -226,7 +230,7 @@ def fetch_sponsor(congress, bill_type, number):
     return None
 
 def fetch_bill_actions(congress, bill_type, number):
-    url = f"https://api.congress.gov/v3/bill/{congress}/{bill_type}/{number}/actions?api_key={congress_api_key}&format=json"
+    url = f"{CONGRESS_API_BASE_URL}bill/{congress}/{bill_type}/{number}/actions?api_key={congress_api_key}&format=json"
     response = fetch_with_retries(url)
     if response:
         try:
@@ -244,7 +248,7 @@ def fetch_bill_actions(congress, bill_type, number):
     return []
 
 def fetch_crs_summary(congress, bill_type, number):
-    url = f"https://api.congress.gov/v3/summaries/{congress}/{bill_type}/{number}?api_key={congress_api_key}&format=json"
+    url = f"{CONGRESS_API_BASE_URL}summaries/{congress}/{bill_type}/{number}?api_key={congress_api_key}&format=json"
     response = fetch_with_retries(url)
     if response:
         try:
@@ -255,7 +259,7 @@ def fetch_crs_summary(congress, bill_type, number):
     return None
 
 def fetch_amendments(congress, bill_type, number):
-    url = f"https://api.congress.gov/v3/bill/{congress}/{bill_type}/{number}/amendments?api_key={congress_api_key}&format=json"
+    url = f"{CONGRESS_API_BASE_URL}bill/{congress}/{bill_type}/{number}/amendments?api_key={congress_api_key}&format=json"
     response = fetch_with_retries(url)
     if response:
         try:
@@ -288,7 +292,7 @@ def fetch_bill_data(congress, bill_type, number):
         add_skipped_bill(congress, bill_type, number, "No sponsor data")
         return None
     
-    bill_details = fetch_with_retries(f"https://api.congress.gov/v3/bill/{congress}/{bill_type}/{number}?api_key={congress_api_key}&format=json")
+    bill_details = fetch_with_retries(f"{CONGRESS_API_BASE_URL}bill/{congress}/{bill_type}/{number}?api_key={congress_api_key}&format=json")
     if not bill_details:
         logging.info(f"Skipping {congress}/{bill_type}/{number} - Failed to fetch details")
         add_skipped_bill(congress, bill_type, number, "Failed to fetch details")
@@ -460,7 +464,7 @@ def retry_skipped_bills():
 def load_tweet_template(filename):
     """Load the tweet template from the templates directory."""
     try:
-        with open(f'/home/srrdx9mw12tk/congressclear/templates/{filename}', 'r') as f:
+        with open(os.path.join(BASE_PATH, 'templates', filename), 'r') as f:
             return f.read()
     except FileNotFoundError:
         logging.error(f"Template {filename} not found")
@@ -469,7 +473,7 @@ def load_tweet_template(filename):
 def load_prompt(filename):
     """Load the prompt template from the prompts directory."""
     try:
-        with open(f'/home/srrdx9mw12tk/congressclear/prompts/{filename}', 'r') as f:
+        with open(os.path.join(BASE_PATH, 'prompts', filename), 'r') as f:
             return f.read()
     except FileNotFoundError:
         logging.error(f"Prompt {filename} not found")
@@ -630,7 +634,7 @@ def load_template(template_name):
     :param template_name: Name of the template file (e.g., 'monday_post.txt')
     :return: The content of the template file as a string, or None if not found
     """
-    template_path = os.path.join('/home/srrdx9mw12tk/congressclear/templates', template_name)
+    template_path = os.path.join(os.path.join(BASE_PATH, 'templates'), template_name)
     try:
         with open(template_path, 'r') as file:
             return file.read()
@@ -675,7 +679,7 @@ def fetch_bill_details(bill_id, api_key):
         return None
     
     # Fetch bill data
-    url = f"https://api.congress.gov/v3/bill/{congress}/{bill_type}/{bill_number}?api_key={api_key}"
+    url = f"{CONGRESS_API_BASE_URL}bill/{congress}/{bill_type}/{bill_number}?api_key={api_key}"
     data = fetch_api_data(url)
     if not data or "bill" not in data:
         logging.warning(f"Failed to fetch details for {bill_id}")
@@ -728,3 +732,79 @@ def summarize_text_concise(text, bill_title, status, congress, bill_type, number
         f"Bill: {bill_type.upper()}.{number}\nText Sample: {text[:100]}...\nLast Summary: {last_summary}\nError: 5 attempts failed"
     )
     return "Summary unavailable due to insufficient data"
+
+# Centralized functions added below
+def configure_logging(filename, add_stream=False):
+    handlers = [logging.FileHandler(filename, mode='a')]
+    if add_stream:
+        handlers.append(logging.StreamHandler())
+    logging.getLogger('').handlers = []  # Reset handlers to prevent test tweet leftovers
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s %(levelname)s: %(message)s',
+        handlers=handlers
+    )
+
+def build_bill_data(bill, congress=None):
+    congress = congress or bill.get('congress', '118')
+    return {
+        'congress': congress,
+        'type': bill.get('type', '').lower(),
+        'number': bill.get('number', ''),
+        'title': bill.get('title', ''),
+        'sponsor': bill.get('sponsor', {}),
+        'introducedDate': bill.get('introducedDate', ''),
+        'actions': bill.get('latestAction', {}),
+        'link': bill.get('congressdotgov_url', f"https://www.congress.gov/bill/{congress}th-congress/{bill.get('type', '').lower()}-bill/{bill.get('number', '')}")
+    }
+
+def format_tweet(template, bill_data, summary=None, is_summary=False):
+    defaults = {
+        'status': bill_data.get('status', 'Introduced'),
+        'formatted_bill_type': format_bill_type(bill_data.get('type', bill_data.get('bill_type', ''))),
+        'number': bill_data.get('number', 'N/A'),
+        'formatted_congress': format_congress(bill_data.get('congress', '118')),
+        'title': bill_data.get('title', 'Untitled'),
+        'sponsor_name': bill_data.get('sponsor', {}).get('name', 'Unknown Sponsor'),
+        'sponsor_party': bill_data.get('sponsor', {}).get('party', 'N/A'),
+        'sponsor_state': bill_data.get('sponsor', {}).get('state', 'N/A'),
+        'sponsor_party_state': f"[{bill_data.get('sponsor', {}).get('party', 'N/A')}-{bill_data.get('sponsor', {}).get('state', 'N/A')}]",
+        'introduced_date': bill_data.get('introducedDate', bill_data.get('introduced_date', 'Unknown')),
+        'summary': summary or bill_data.get('summary', 'Summary unavailable'),
+        'actions_list': format_actions(bill_data.get('actions', {}).get('items', [])) or 'No actions available',
+        'link': bill_data.get('link', f"https://www.congress.gov/bill/{bill_data.get('congress', '118')}th-congress/{bill_data.get('type', bill_data.get('bill_type', '')).lower()}-bill/{bill_data.get('number', 'N/A')}")
+    }
+    try:
+        if is_summary:
+            # Monday summary format (concatenation)
+            tweet_text = template  # Template is the pre-built string from main()
+        else:
+            # Bill tweet format (template-based)
+            tweet_text = template.format(**{**bill_data, **defaults})
+        
+        if '{' in tweet_text or '}' in tweet_text:
+            bill_id = f"{defaults['formatted_bill_type']}.{defaults['number']}"
+            logging.error(f"Failed to format tweet for {bill_id} - incomplete data")
+            if not is_summary:  # Only add to skipped_bills for bill tweets
+                add_skipped_bill(bill_data, reason="Incomplete tweet data")
+            return None
+        return tweet_text
+    except Exception as e:
+        bill_id = f"{defaults['formatted_bill_type']}.{defaults['number']}"
+        logging.error(f"Error formatting tweet for {bill_id}: {str(e)}")
+        if not is_summary:  # Only add to skipped_bills for bill tweets
+            add_skipped_bill(bill_data, reason=f"Tweet formatting error: {str(e)}")
+        return None
+
+def add_skipped_bill(bill_data, reason="Unknown failure"):
+    with sqlite3.connect(DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute('''INSERT OR IGNORE INTO skipped_bills 
+                     (title, congress, bill_type, number, retry_count, last_attempt, reason)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                  (bill_data.get('title', 'Unknown'),
+                   bill_data.get('congress', '118'),
+                   bill_data.get('type', bill_data.get('bill_type', 'unknown')),
+                   bill_data.get('number', 'N/A'),
+                   0, datetime.now().isoformat(), reason))
+        conn.commit()
