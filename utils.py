@@ -14,14 +14,21 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 import hashlib
 
+with open('config.json', 'r') as config_file:
+    config = json.load(config_file)
+BASE_PATH = config['base_path']
+CONGRESS_API_BASE_URL = config['congress_api_base_url']
+API_KEY = config['api_key']
+CONGRESS_API_KEY = config['congress_api_key']
+
+# Initial logging setup for utils.py
+setup_logging(os.path.join(BASE_PATH, 'scraper.log'))
+
 # Centralized logging setup function
 def setup_logging(filename):
     """Set up logging with a specified filename."""
     logging.basicConfig(filename=filename, level=logging.INFO,
                         format='%(asctime)s %(levelname)s: %(message)s')
-
-# Initial logging setup for utils.py
-setup_logging(os.path.join(BASE_PATH, 'scraper.log'))
 
 # Determine database path based on the presence of test_mode.txt
 if os.path.exists(os.path.join(BASE_PATH, 'test_mode.txt')):
