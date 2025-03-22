@@ -6,7 +6,7 @@ from datetime import datetime
 import utils
 import os
 
-utils.configure_logging(os.path.join(utils.BASE_PATH, 'retry_skipped_bills.log'), add_stream=True)
+utils.setup_logging(os.path.join(utils.BASE_PATH, 'retry_skipped_bills.log'), add_stream=True)
 
 def retry_skipped_bills():
     logging.info("Starting retry_skipped_bills process")

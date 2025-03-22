@@ -5,7 +5,6 @@ import json
 import logging
 import time
 import re
-import os
 import tweepy
 from datetime import datetime, timedelta
 from xml.etree import ElementTree as ET
@@ -14,52 +13,52 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 import hashlib
 
-with open('config.json', 'r') as config_file:
+# Load all config values at the top
+with open(os.path.join(os.path.dirname(__file__), 'config.json'), 'r') as config_file:
     config = json.load(config_file)
 BASE_PATH = config['base_path']
 CONGRESS_API_BASE_URL = config['congress_api_base_url']
 API_KEY = config['api_key']
+API_SECRET = config['api_secret']
+ACCESS_TOKEN = config['access_token']
+ACCESS_TOKEN_SECRET = config['access_token_secret']
+BEARER_TOKEN = config['bearer_token']
 CONGRESS_API_KEY = config['congress_api_key']
-
-# Initial logging setup for utils.py
-setup_logging(os.path.join(BASE_PATH, 'scraper.log'))
+GEMINI_API_KEY = config['gemini_api_key']
+EMAIL = config['email']
+EMAIL_PASSWORD = config['email_password']
+SENDGRID_API_KEY = config['sendgrid_api_key']
+EMAIL_FROM = config['email_from']
+EMAIL_TO = config['email_to']
+TWITTER_HANDLE = config['twitter_handle']
+DB_PATH = config['db_path']
+TEST_DB_PATH = config['test_db_path']
+RSS_URL = config['rss_url']
+TWEET_COUNT_FILE = config['tweet_count_file']
+HASHTAGS_FILE = config['hashtags_file']
 
 # Centralized logging setup function
 def setup_logging(filename):
     """Set up logging with a specified filename."""
+    logging.getLogger('').handlers = []  # Reset handlers to prevent rogue tweets
     logging.basicConfig(filename=filename, level=logging.INFO,
                         format='%(asctime)s %(levelname)s: %(message)s')
 
-# Determine database path based on the presence of test_mode.txt
-if os.path.exists(os.path.join(BASE_PATH, 'test_mode.txt')):
-    DB_PATH = os.path.join(BASE_PATH, 'test.db')  # Testing database
-    logging.info("Test mode enabled: Using test.db")
-else:
-    DB_PATH = os.path.join(BASE_PATH, 'congress.db')  # Production database
-    logging.info("Production mode: Using congress.db")
+# Initial logging setup for utils.py
+setup_logging(os.path.join(BASE_PATH, 'scraper.log'))
 
-# Load config function
-def load_config():
-    """Load the configuration from config.json."""
-    CONFIG_PATH = CONFIG_PATH
-    with open(CONFIG_PATH, 'r') as f:
-        return json.load(f)
-    BASE_PATH = config["base_path"]
-    CONGRESS_API_BASE_URL = config["congress_api_base_url"]
-
-config = load_config()
-congress_api_key = config["congress_api_key"]
-genai.configure(api_key=config["gemini_api_key"])
-email_from = config["email"]
-email_to = config["email_to"]
-sendgrid_api_key = config["sendgrid_api_key"]
+# Use DB_PATH directly from config
+logging.info("Production mode: Using congress.db")
 
 # Load hashtag configuration
-with open(os.path.join(BASE_PATH, 'hashtags.json'), 'r') as f:
+with open(os.path.join(BASE_PATH, HASHTAGS_FILE), 'r') as f:
     hashtag_config = json.load(f)
 HASHTAG_POOL = hashtag_config["subjects"]
 STATE_HASHTAGS = hashtag_config["states"]
 MANDATORY_HASHTAGS = hashtag_config["mandatory"]
+
+# Configure Gemini API
+genai.configure(api_key=GEMINI_API_KEY)
 
 # Legislation type mapping for Congress.gov URLs
 LEGISLATION_TYPE_MAP = {
@@ -77,10 +76,10 @@ def get_tweepy_client():
     for attempt in range(max_attempts):
         try:
             client = tweepy.Client(
-                consumer_key=config["api_key"],
-                consumer_secret=config["api_secret"],
-                access_token=config["access_token"],
-                access_token_secret=config["access_token_secret"]
+                consumer_key=API_KEY,
+                consumer_secret=API_SECRET,
+                access_token=ACCESS_TOKEN,
+                access_token_secret=ACCESS_TOKEN_SECRET
             )
             test_response = client.create_tweet(text=f"Test tweet from @ezlegislation at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             client.delete_tweet(id=test_response.data['id'])
@@ -187,7 +186,7 @@ def clean_summary(summary):
     return summary
 
 def fetch_bill_text(congress, bill_type, number):
-    url = f"{CONGRESS_API_BASE_URL}bill/{congress}/{bill_type}/{number}/text?api_key={congress_api_key}&format=json"
+    url = f"{CONGRESS_API_BASE_URL}bill/{congress}/{bill_type}/{number}/text?api_key={CONGRESS_API_KEY}&format=json"
     logging.info(f"Fetching text metadata: {url}")
     response = fetch_with_retries(url)
     if response:
@@ -222,12 +221,14 @@ def fetch_bill_text(congress, bill_type, number):
     return None
 
 def fetch_sponsor(congress, bill_type, number):
-    url = f"{CONGRESS_API_BASE_URL}bill/{congress}/{bill_type}/{number}?api_key={congress_api_key}&format=json"
+    url = f"{CONGRESS_API_BASE_URL}bill/{congress}/{bill_type}/{number}?api_key={CONGRESS_API_KEY}&format=json"
     response = fetch_with_retries(url)
     if response:
         try:
             sponsor = response.json()['bill'].get('sponsors', [{}])[0]
             name = f"{sponsor.get('firstName', '')} {sponsor.get('middleName', '') or ''} {sponsor.get('lastName', '')}".strip()
+            if not name:
+                name = sponsor.get('fullName', 'Unknown Sponsor').replace('Rep. ', '').split(' [')[0].strip()
             if not name:
                 logging.error(f"No valid sponsor name for {congress}/{bill_type}/{number}")
                 return None
@@ -237,7 +238,7 @@ def fetch_sponsor(congress, bill_type, number):
     return None
 
 def fetch_bill_actions(congress, bill_type, number):
-    url = f"{CONGRESS_API_BASE_URL}bill/{congress}/{bill_type}/{number}/actions?api_key={congress_api_key}&format=json"
+    url = f"{CONGRESS_API_BASE_URL}bill/{congress}/{bill_type}/{number}/actions?api_key={CONGRESS_API_KEY}&format=json"
     response = fetch_with_retries(url)
     if response:
         try:
@@ -255,7 +256,7 @@ def fetch_bill_actions(congress, bill_type, number):
     return []
 
 def fetch_crs_summary(congress, bill_type, number):
-    url = f"{CONGRESS_API_BASE_URL}summaries/{congress}/{bill_type}/{number}?api_key={congress_api_key}&format=json"
+    url = f"{CONGRESS_API_BASE_URL}summaries/{congress}/{bill_type}/{number}?api_key={CONGRESS_API_KEY}&format=json"
     response = fetch_with_retries(url)
     if response:
         try:
@@ -266,7 +267,7 @@ def fetch_crs_summary(congress, bill_type, number):
     return None
 
 def fetch_amendments(congress, bill_type, number):
-    url = f"{CONGRESS_API_BASE_URL}bill/{congress}/{bill_type}/{number}/amendments?api_key={congress_api_key}&format=json"
+    url = f"{CONGRESS_API_BASE_URL}bill/{congress}/{bill_type}/{number}/amendments?api_key={CONGRESS_API_KEY}&format=json"
     response = fetch_with_retries(url)
     if response:
         try:
@@ -293,13 +294,7 @@ def determine_status(actions):
 
 def fetch_bill_data(congress, bill_type, number):
     actions = fetch_bill_actions(congress, bill_type, number)
-    sponsor = fetch_sponsor(congress, bill_type, number)
-    if not sponsor:
-        logging.info(f"Skipping {congress}/{bill_type}/{number} - No sponsor data")
-        add_skipped_bill(congress, bill_type, number, "No sponsor data")
-        return None
-    
-    bill_details = fetch_with_retries(f"{CONGRESS_API_BASE_URL}bill/{congress}/{bill_type}/{number}?api_key={congress_api_key}&format=json")
+    bill_details = fetch_with_retries(f"{CONGRESS_API_BASE_URL}bill/{congress}/{bill_type}/{number}?api_key={CONGRESS_API_KEY}&format=json")
     if not bill_details:
         logging.info(f"Skipping {congress}/{bill_type}/{number} - Failed to fetch details")
         add_skipped_bill(congress, bill_type, number, "Failed to fetch details")
@@ -310,10 +305,17 @@ def fetch_bill_data(congress, bill_type, number):
         title = bill_info.get('title')
         number_str = bill_info.get('number')
         type_str = bill_info.get('type', '').lower()
+        introduced_date = bill_info.get('introducedDate', '')
         if not title or not number_str or not type_str:
             logging.info(f"Skipping {congress}/{bill_type}/{number} - Missing title, number, or type")
             add_skipped_bill(congress, bill_type, number, "Missing required fields")
             return None
+        sponsor = bill_info.get('sponsors', [{}])[0]
+        sponsor_name = sponsor.get('fullName', 'Unknown Sponsor').replace('Rep. ', '').split(' [')[0].strip()
+        sponsor_name_parts = sponsor_name.split(', ')
+        if len(sponsor_name_parts) == 2:
+            sponsor_name = f"{sponsor_name_parts[1]} {sponsor_name_parts[0]}"
+        sponsor_party_state = f"{sponsor.get('party', 'N/A')}-{sponsor.get('state', 'N/A')}"
     except (json.JSONDecodeError, KeyError):
         logging.error(f"Error parsing bill details for {congress}/{bill_type}/{number}")
         add_skipped_bill(congress, bill_type, number, "Parsing error")
@@ -350,9 +352,9 @@ def fetch_bill_data(congress, bill_type, number):
         'title': title,
         'status': determine_status(actions),
         'text': bill_text,
-        'sponsor_name': sponsor['name'],
-        'sponsor_party_state': sponsor['party_state'],
-        'introduced_date': format_date(min(a['actionDate'] for a in actions if 'actionDate' in a)) if actions else 'Unknown',
+        'sponsor_name': sponsor_name,
+        'sponsor_party_state': sponsor_party_state,
+        'introduced_date': introduced_date,
         'crs_summary': crs_summary,
         'actions_list': actions_list,
         'amendments_list': amendments_list,
@@ -765,6 +767,30 @@ def build_bill_data(bill, congress=None):
         'link': bill.get('congressdotgov_url', f"https://www.congress.gov/bill/{congress}th-congress/{bill.get('type', '').lower()}-bill/{bill.get('number', '')}")
     }
 
+def format_actions(actions):
+    if not actions or len(actions) == 0:
+        return "No actions available"
+    formatted = []
+    for action in actions[:3]:  # Limit to 3 actions
+        date = action.get('actionDate', 'Unknown')
+        text = action.get('text', 'No description')
+        formatted.append(f"{date} - {text}")
+    return "\n".join(formatted)
+
+def post_tweet(tweet_text):
+    client = tweepy.Client(
+        consumer_key=API_KEY,
+        consumer_secret=API_SECRET,
+        access_token=ACCESS_TOKEN,
+        access_token_secret=ACCESS_TOKEN_SECRET
+    )
+    try:
+        tweet_response = client.create_tweet(text=tweet_text)
+        return tweet_response.data['id']
+    except tweepy.TweepyException as e:
+        logging.error(f"Failed to post tweet: {e}")
+        return None
+
 def format_tweet(template, bill_data, summary=None, is_summary=False):
     defaults = {
         'status': bill_data.get('status', 'Introduced'),
@@ -772,13 +798,13 @@ def format_tweet(template, bill_data, summary=None, is_summary=False):
         'number': bill_data.get('number', 'N/A'),
         'formatted_congress': format_congress(bill_data.get('congress', '118')),
         'title': bill_data.get('title', 'Untitled'),
-        'sponsor_name': bill_data.get('sponsor', {}).get('name', 'Unknown Sponsor'),
-        'sponsor_party': bill_data.get('sponsor', {}).get('party', 'N/A'),
-        'sponsor_state': bill_data.get('sponsor', {}).get('state', 'N/A'),
-        'sponsor_party_state': f"[{bill_data.get('sponsor', {}).get('party', 'N/A')}-{bill_data.get('sponsor', {}).get('state', 'N/A')}]",
-        'introduced_date': bill_data.get('introducedDate', bill_data.get('introduced_date', 'Unknown')),
+		'sponsor_name': bill_data.get('sponsor_name', 'Unknown Sponsor'),
+        'sponsor_party': bill_data.get('sponsor_party', 'N/A'),
+        'sponsor_state': bill_data.get('sponsor_state', 'N/A'),
+        'sponsor_party_state': bill_data.get('sponsor_party_state', '[N/A-N/A]'),
+        'introduced_date': format_date(bill_data.get('introduced_date', 'Unknown')),
         'summary': summary or bill_data.get('summary', 'Summary unavailable'),
-        'actions_list': format_actions(bill_data.get('actions', {}).get('items', [])) or 'No actions available',
+        'actions_list': format_actions(bill_data.get('actions', [])) or 'No actions available',
         'link': bill_data.get('link', f"https://www.congress.gov/bill/{bill_data.get('congress', '118')}th-congress/{bill_data.get('type', bill_data.get('bill_type', '')).lower()}-bill/{bill_data.get('number', 'N/A')}")
     }
     try:

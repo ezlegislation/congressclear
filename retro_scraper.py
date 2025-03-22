@@ -7,7 +7,7 @@ from datetime import datetime
 
 import utils
 
-utils.configure_logging(os.path.join(utils.BASE_PATH, 'retro_scraper.log'))
+utils.setup_logging(os.path.join(utils.BASE_PATH, 'retro_scraper.log'))
 
 def process_bill(bill_data, tweeted_from_check=0):
     congress = bill_data.get('congress', '118')
@@ -90,7 +90,7 @@ def main():
     limit = 250
 
     while True:
-        url = f"https://api.congress.gov/v3/bill/{congress}?offset={offset}&limit={limit}&sort=updateDate+asc&api_key={utils.congress_api_key}"
+        url = f"https://api.congress.gov/v3/bill/{congress}?offset={offset}&limit={limit}&sort=updateDate+asc&api_key={utils.CONGRESS_API_KEY}"
         response = utils.fetch_with_retries(url)
         if response.status_code != 200:
             logging.error(f"Failed to fetch bills: {response.status_code}")

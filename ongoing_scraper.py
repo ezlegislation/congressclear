@@ -7,7 +7,7 @@ from datetime import datetime
 
 import utils
 
-utils.configure_logging(os.path.join(utils.BASE_PATH, 'ongoing_scraper.log'))
+utils.setup_logging(os.path.join(utils.BASE_PATH, 'ongoing_scraper.log'))
 
 def process_bill(bill_data, tweeted_from_check=0):
     congress = bill_data.get('congress', '118')
@@ -100,7 +100,7 @@ def main():
     
     logging.info("Running ongoing mode - newest first with sort=updateDate+desc")
     while True:
-        url = f"https://api.congress.gov/v3/bill?sort=updateDate+desc&limit=250&api_key={utils.congress_api_key}"
+        url = f"https://api.congress.gov/v3/bill?sort=updateDate+desc&limit=250&api_key={utils.CONGRESS_API_KEY}"
         response = utils.fetch_with_retries(url)
         if response.status_code != 200:
             logging.error(f"Failed to fetch bills: {response.status_code}")

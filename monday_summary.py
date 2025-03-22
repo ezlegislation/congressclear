@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 import sqlite3
 import json
 
-utils.configure_logging(os.path.join(utils.BASE_PATH, 'monday_summary.log'))
+utils.setup_logging(os.path.join(utils.BASE_PATH, 'monday_summary.log'))
 
 def get_previous_monday():
     today = datetime.now().date()
@@ -48,7 +48,7 @@ def parse_rss_entry(entry):
                 max_attempts = 3
                 bill_details = None
                 while attempt < max_attempts:
-                    bill_details = utils.fetch_bill_details(bill_id, utils.congress_api_key)
+                    bill_details = utils.fetch_bill_details(bill_id, utils.CONGRESS_API_KEY)
                     if bill_details and all(key in bill_details for key in ['title', 'sponsor_name', 'introduced_date', 'link']):
                         break
                     attempt += 1
