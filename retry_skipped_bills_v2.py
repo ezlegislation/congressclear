@@ -4,9 +4,17 @@ import time
 import hashlib
 from datetime import datetime
 import utils
-import os
 
-utils.setup_logging(os.path.join(utils.BASE_PATH, 'retry_skipped_bills.log'), add_stream=True)
+# Clear any existing handlers to avoid conflicts
+logging.getLogger('').handlers = []
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s: %(message)s',
+    handlers=[
+        logging.FileHandler('/home/srrdx9mw12tk/congressclear/retry_skipped_bills.log', mode='a'),
+        logging.StreamHandler()
+    ]
+)
 
 def retry_skipped_bills():
     logging.info("Starting retry_skipped_bills process")
