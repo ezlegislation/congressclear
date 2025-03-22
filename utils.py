@@ -570,21 +570,17 @@ def validate_summary(summary):
 
 def get_hashtags(text, sponsor_state):
     """Generate hashtags using Gemini AI."""
-    if not text or not sponsor_state:
-        return MANDATORY_HASHTAGS  # Fallback to 3 mandatory hashtags
-    hashtag_list = [tag for sublist in HASHTAG_POOL.values() for tag in sublist]
-    party = sponsor_state.split('-')[0] if '-' in sponsor_state else 'Unknown'
-    party_hashtag = "#Democrat" if party == "D" else "#Republican" if party == "R" else ""
-    state_key = sponsor_state.split('-')[-1] if '-' in sponsor_state else sponsor_state
-    state_hashtag = STATE_HASHTAGS.get(state_key, "")
-    prompt = f"Select up to 10 relevant hashtags from: {', '.join(hashtag_list)}\nExclude: {', '.join(MANDATORY_HASHTAGS + [party_hashtag, state_hashtag])}\nText: {text}\nReturn hashtags separated by spaces."
+    if not text:
+        return MANDATORY_HASHTAGS[:5]
+    hashtag_list = [tag for sublist in HASHTAG_POOL.values() for tag in sublist] + list(STATE_HASHTAGS.values())
+    prompt = f"Select up to 5 relevant hashtags from: {', '.join(hashtag_list)}\nExclude: {', '.join(MANDATORY_HASHTAGS)}\nText: {text}\nInclude state tags for {sponsor_state} if relevant. Return hashtags separated by spaces."
     try:
         model = genai.GenerativeModel('gemini-1.5-flash')
         hashtags = model.generate_content(prompt).text.strip().split()
-        return list(dict.fromkeys(MANDATORY_HASHTAGS + [party_hashtag, state_hashtag] + hashtags))[:15]
+        return list(dict.fromkeys(MANDATORY_HASHTAGS + hashtags))[:5]
     except Exception as e:
         logging.error(f"Hashtag error: {e}")
-        return MANDATORY_HASHTAGS  # Fallback to 3 if Gemini fails
+        return MANDATORY_HASHTAGS[:5]
 
 def send_email(subject, body):
     """Send an email using SendGrid."""
