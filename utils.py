@@ -50,12 +50,7 @@ setup_logging(os.path.join(BASE_PATH, 'scraper.log'))
 # Use DB_PATH directly from config
 logging.info("Production mode: Using congress.db")
 
-# Load hashtag configuration
-with open(os.path.join(BASE_PATH, HASHTAGS_FILE), 'r') as f:
-    hashtag_config = json.load(f)
-HASHTAG_POOL = hashtag_config["subjects"]
-STATE_HASHTAGS = hashtag_config["states"]
-MANDATORY_HASHTAGS = hashtag_config["mandatory"]
+# Hashtags loaded dynamically in get_hashtags() - no globals needed
 
 # Configure Gemini API
 genai.configure(api_key=GEMINI_API_KEY)
@@ -582,18 +577,30 @@ def validate_summary(summary):
         return False
 
 def get_hashtags(text, sponsor_state):
-    """Generate hashtags using Gemini AI."""
-    if not text:
-        return MANDATORY_HASHTAGS[:5]
-    hashtag_list = [tag for sublist in HASHTAG_POOL.values() for tag in sublist] + list(STATE_HASHTAGS.values())
-    prompt = f"Select up to 5 relevant hashtags from: {', '.join(hashtag_list)}\nExclude: {', '.join(MANDATORY_HASHTAGS)}\nText: {text}\nInclude state tags for {sponsor_state} if relevant. Return hashtags separated by spaces."
+    """Generate hashtags using Gemini AI, loading hashtags.json dynamically with party and state logic."""
+    if not text or not sponsor_state:
+        return ["#Congress", "#Legislation", "#USGovernment"][:15]  # Fallback if no text or state
+    with open(os.path.join(BASE_PATH, 'config', 'hashtags.json'), 'r') as f:
+        hashtag_config = json.load(f)
+    hashtag_pool = hashtag_config["subjects"]
+    state_hashtags = hashtag_config["states"]
+    mandatory_hashtags = hashtag_config["mandatory"]
+    hashtag_list = [tag for sublist in hashtag_pool.values() for tag in sublist]  # Only subjects
+    
+    # Extract party and state from sponsor_state (e.g., "D-CO")
+    party = sponsor_state.split('-')[0] if '-' in sponsor_state else 'Unknown'
+    party_hashtag = "#Democrat" if party == "D" else "#Republican" if party == "R" else ""
+    state_key = sponsor_state.split('-')[-1] if '-' in sponsor_state else sponsor_state
+    state_hashtag = state_hashtags.get(state_key, "")
+    
+    prompt = f"Select up to 10 relevant hashtags from: {', '.join(hashtag_list)}\nExclude: {', '.join(mandatory_hashtags + [party_hashtag, state_hashtag])}\nText: {text}\nReturn hashtags separated by spaces."
     try:
         model = genai.GenerativeModel('gemini-1.5-flash')
         hashtags = model.generate_content(prompt).text.strip().split()
-        return list(dict.fromkeys(MANDATORY_HASHTAGS + hashtags))[:5]
+        return list(dict.fromkeys(mandatory_hashtags + [party_hashtag, state_hashtag] + hashtags))[:15]
     except Exception as e:
         logging.error(f"Hashtag error: {e}")
-        return MANDATORY_HASHTAGS[:5]
+        return mandatory_hashtags[:15]
 
 def send_email(subject, body):
     """Send an email using SendGrid."""
