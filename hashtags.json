@@ -1,40 +1,119 @@
 {
   "subjects": {
-    "Agriculture and Food": ["#Agriculture", "#Farming"],
-    "Animals": ["#Animals", "#Wildlife"],
-    "Armed Forces and National Security": ["#Military", "#NationalSecurity"],
-    "Veterans": ["#Veterans", "#Vets"],
-    "Arts, Culture, Religion": ["#Arts", "#Culture"],
-    "Civil Rights and Liberties, Minority Issues": ["#CivilRights", "#Equality"],
-    "Commerce": ["#Commerce", "#Business"],
-    "Congress": ["#Congress", "#Legislation"],
-    "Crime and Law Enforcement": ["#Crime", "#LawEnforcement"],
-    "Economics and Public Finance": ["#Economy", "#Finance"],
-    "Education": ["#Education", "#Schools"],
-    "Emergency Management": ["#Emergency", "#DisasterRelief"],
-    "Energy": ["#Energy", "#RenewableEnergy"],
-    "Environmental Protection": ["#Environment", "#ClimateChange"],
-    "Families": ["#Families", "#ChildCare"],
-    "Finance and Financial Sector": ["#Finance", "#Banking"],
-    "Foreign Trade and International Finance": ["#Trade", "#GlobalEconomy"],
-    "Government Operations and Politics": ["#Government", "#Politics"],
-    "Health": ["#Healthcare", "#PublicHealth"],
-    "Medicare": ["#Medicare", "#Seniors"],
-    "Medicaid": ["#Medicaid", "#LowIncome"],
-    "Social Security": ["#SocialSecurity", "#Retirement"],
-    "Housing and Community Development": ["#Housing", "#Communities"],
-    "Immigration": ["#Immigration", "#BorderSecurity"],
-    "International Affairs": ["#ForeignPolicy", "#Diplomacy"],
-    "Labor and Employment": ["#Jobs", "#Labor"],
-    "Law": ["#Law", "#JusticeSystem"],
-    "Native Americans": ["#NativeAmericans", "#TribalRights"],
-    "Science and Technology": ["#Science", "#Technology"],
-    "Social Welfare": ["#SocialWelfare", "#Poverty"],
-    "Sports and Recreation": ["#Sports", "#Recreation"],
-    "Taxation": ["#Taxes", "#TaxReform"],
-    "Transportation and Public Works": ["#Transportation", "#Infrastructure"],
-    "Water Resources Development": ["#Water", "#Conservation"],
-    "General": ["#Legislation", "#Congress", "#USGovernment"]
+    "Agriculture": [
+      "#Agriculture", "#Farming", "#FoodSecurity", "#Drought", "#FarmSubsidies"
+    ],
+    "Animals": [
+      "#Wildlife", "#Conservation", "#AnimalWelfare"
+    ],
+    "Armed Forces": [
+      "#Military", "#NationalSecurity", "#Defense", "#Troops", "#War"
+    ],
+    "Veterans": [
+      "#Veterans", "#Vets", "#VA", "#VeteranBenefits"
+    ],
+    "Arts and Culture": [
+      "#Arts", "#Culture", "#Heritage"
+    ],
+    "Civil Rights": [
+      "#CivilRights", "#Equality", "#Justice", "#VotingRights", "#SocialJustice", "#SocialReform"
+    ],
+    "Commerce": [
+      "#Business", "#Trade", "#Tariffs", "#SmallBusiness", "#Entrepreneurship"
+    ],
+    "Congress": [
+      "#Congress", "#Legislation", "#Lawmaking", "#USCongress"
+    ],
+    "Crime": [
+      "#Crime", "#LawEnforcement", "#JusticeSystem", "#PublicSafety", "#DrugPolicy", "#Corruption", "#Bans"
+    ],
+    "Economics": [
+      "#Economy", "#Finance", "#EconomicGrowth", "#Budget", "#Stocks", "#Inflation"
+    ],
+    "Education": [
+      "#Education", "#Schools", "#HigherEducation", "#StudentDebt", "#DeptOfEducation"
+    ],
+    "Emergency Management": [
+      "#Emergency", "#DisasterRelief", "#FEMA", "#Hurricanes", "#Earthquakes", "#FirstResponders"
+    ],
+    "Energy": [
+      "#Energy", "#RenewableEnergy", "#CleanEnergy", "#Oil", "#Gas"
+    ],
+    "Environment": [
+      "#Environment", "#ClimateChange", "#GreenEnergy", "#Sustainability"
+    ],
+    "Families": [
+      "#Families", "#ChildCare", "#Adoption"
+    ],
+    "Finance and Markets": [
+      "#Finance", "#Banking", "#Cryptocurrency", "#Crypto", "#Bitcoin"
+    ],
+    "Foreign Affairs": [
+      "#ForeignPolicy", "#GlobalAffairs", "#Trade", "#War"
+    ],
+    "Government": [
+      "#Government", "#Politics", "#Transparency", "#Elections", "#Corruption"
+    ],
+    "Agencies": [
+      "#DOJ", "#FBI", "#FDA", "#DHS", "#EPA", "#IRS", "#FAA"
+    ],
+    "Health": [
+      "#Healthcare", "#PublicHealth", "#MentalHealth", "#WomensHealth"
+    ],
+    "Medicare": [
+      "#Medicare", "#Seniors", "#ElderCare"
+    ],
+    "Medicaid": [
+      "#Medicaid", "#HealthcareAccess"
+    ],
+    "Social Security": [
+      "#SocialSecurity", "#Retirement"
+    ],
+    "Housing": [
+      "#Housing", "#AffordableHousing"
+    ],
+    "Immigration": [
+      "#Immigration", "#BorderSecurity"
+    ],
+    "Employment": [
+      "#Jobs", "#Employment", "#Unemployment"
+    ],
+    "Law": [
+      "#Law", "#JusticeSystem", "#Privacy", "#FreeSpeech", "#Censorship", "#Bans"
+    ],
+    "Social Networks": [
+      "#SocialNetwork", "#SocialMedia", "#OnlineSafety", "#DigitalDivide", "#Misinformation"
+    ],
+    "Technology": [
+      "#Technology", "#Innovation", "#Cybersecurity", "#AI"
+    ],
+    "Welfare": [
+      "#SocialWelfare", "#Poverty", "#SocialReform"
+    ],
+    "Taxation": [
+      "#Taxes", "#TaxReform", "#IncomeTax"
+    ],
+    "Transportation": [
+      "#Transportation", "#Infrastructure", "#ElectricVehicles"
+    ],
+    "Water": [
+      "#Water", "#Conservation"
+    ],
+    "General": [
+      "#USA", "#News", "#Democracy", "#Policy"
+    ],
+    "Civic": [
+      "#Vote", "#Elections"
+    ],
+    "Work": [
+      "#Jobs", "#Employment"
+    ],
+    "Health Issues": [
+      "#Healthcare", "#MentalHealth"
+    ],
+    "Political Issues": [
+      "#StudentDebt", "#Equality", "#Bans"
+    ]
   },
   "states": {
     "AL": "#Alabama", "AK": "#Alaska", "AZ": "#Arizona", "AR": "#Arkansas", "CA": "#California",
