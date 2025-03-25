@@ -732,3 +732,32 @@ def summarize_text_concise(text, bill_title, status, congress, bill_type, number
         f"Bill: {bill_type.upper()}.{number}\nText Sample: {text[:100]}...\nLast Summary: {last_summary}\nError: 5 attempts failed"
     )
     return "Summary unavailable due to insufficient data"
+
+def validate_tweet_data(bill_data):
+    """
+    Check if all required fields for a tweet are present and non-empty.
+    Returns True if valid, False if any field is missing or empty.
+    """
+    required_fields = [
+        'status', 'formatted_bill_type', 'number', 'title',
+        'sponsor_name', 'sponsor_party_state', 'introduced_date',
+        'summary', 'actions_list', 'link'
+    ]
+    for field in required_fields:
+        if field not in bill_data or not bill_data[field]:
+            logging.warning(f"Missing or empty field '{field}' in bill data: {bill_data}")
+            return False
+    return True
+
+def get_party_hashtag(sponsor_party_state):
+    """
+    Generate the party hashtag based on sponsor_party_state (e.g., 'D-NY' -> '#Democrat').
+    """
+    party = sponsor_party_state.split('-')[0]  # Extract 'D' or 'R'
+    if party == 'D':
+        return '#Democrat'
+    elif party == 'R':
+        return '#Republican'
+    else:
+        logging.warning(f"Unknown party in sponsor_party_state: {sponsor_party_state}")
+        return ''

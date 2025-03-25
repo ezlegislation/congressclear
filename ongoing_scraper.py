@@ -6,10 +6,12 @@ from datetime import datetime, timedelta
 import json
 import hashlib
 
+# Set up logging as per the original configuration
 utils.setup_logging('/home/srrdx9mw12tk/congressclear/ongoing_scraper.log')
 client = utils.get_tweepy_client()
 
 def OngoingScraper():
+    # Check if retro mode is complete, exit if not
     if not os.path.exists("/home/srrdx9mw12tk/congressclear/retro_complete.txt"):
         logging.info("Retro mode not complete - exiting")
         exit(0)
@@ -19,11 +21,13 @@ def OngoingScraper():
     while True:
         skipped_results = utils.retry_skipped_bills()
         
+        # Load and reset tweet count if more than a day has passed
         tweeted_count, last_reset = utils.load_tweet_count()
         if datetime.now() - last_reset > timedelta(days=1):
             tweeted_count = 0
             utils.save_tweet_count(tweeted_count, datetime.now())
 
+        # Construct URL for fetching recent bills
         url = f"https://api.congress.gov/v3/bill?api_key={utils.congress_api_key}&limit=250&congress={congress}&fromDateTime={(datetime.now() - timedelta(days=7)).isoformat()[:10]}T00:00:00Z"
         response = utils.fetch_with_retries(url)
         if not response:
@@ -40,7 +44,8 @@ def OngoingScraper():
             continue
 
         for bill in bills + skipped_results:
-            if isinstance(bill, dict) and 'title' not in bill:  # Handle skipped_results
+            # Handle skipped_results dictionary format
+            if isinstance(bill, dict) and 'title' not in bill:
                 bill_title = bill.get('title', 'Unknown')
                 number = bill.get('number', 'Unknown')
                 bill_type = bill.get('bill_type', '').lower()
@@ -50,11 +55,13 @@ def OngoingScraper():
                 number = bill.get('number')
                 bill_type = bill.get('type', '').lower()
             
+            # Skip bills missing required fields
             if not bill_title or not number or not bill_type:
                 logging.info(f"Skipping {bill_title or 'unknown'} - Missing required fields")
                 utils.add_skipped_bill(congress, bill_type, number, "Missing required fields")
                 continue
 
+            # Filter out non-bill/joint resolution types
             if bill_type not in ['s', 'hr', 'sjres', 'hjres']:
                 logging.info(f"Skipping {bill_title} - Not a bill/joint resolution ({bill_type})")
                 continue
@@ -66,6 +73,13 @@ def OngoingScraper():
                 logging.info(f"Skipping {bill_title} - Invalid bill data")
                 continue
 
+            # NEW: Validate tweet data before proceeding
+            if not utils.validate_tweet_data(bill_data):
+                logging.warning(f"Bill {bill_id} has incomplete data, marking for retry.")
+                utils.add_skipped_bill(congress, bill_type, bill_number, "Incomplete data")
+                continue
+
+            # Check bill status in database
             check = utils.check_bill(bill_data['title'], bill_data['status'])
             tweeted = check[0] if check else 0
             old_text_hash = check[1] if check else None
@@ -74,6 +88,7 @@ def OngoingScraper():
 
             logging.info(f"{bill_id} - Tweeted from check: {tweeted}, Bill data tweeted: {bill_data.get('tweeted')}")
 
+            # Handle tweet rate limits
             daily_limit = 50 if datetime.now() < datetime(2025, 3, 22) else 17
             tweeted_count, last_reset = utils.handle_rate_limit(tweeted_count, last_reset, daily_limit)
 
@@ -111,10 +126,16 @@ def OngoingScraper():
             # Set post_link to summary_post_id (latest summary tweet)
             bill_data['post_link'] = f"https://x.com/ezlegislation/status/{check[4]}" if check and check[4] else "No summary available yet"
 
-            hashtags = " ".join(utils.get_hashtags(bill_data['text'] or bill_data['crs_summary'] or '', bill_data['sponsor_party_state'].split('-')[1]))
+            # NEW: Generate hashtags including party hashtag
+            state = bill_data['sponsor_party_state'].split('-')[1] if '-' in bill_data['sponsor_party_state'] else ''
+            gemini_hashtags = utils.get_hashtags(bill_data['text'] or bill_data['crs_summary'] or '', state)
+            party_hashtag = utils.get_party_hashtag(bill_data['sponsor_party_state'])
+            hashtags = " ".join([h for h in gemini_hashtags + [party_hashtag] if h])  # Filter out empty hashtags to avoid extra spaces
+
             tweet = utils.process_template(utils.load_tweet_template(template_name), bill_data, hashtags=hashtags)
             tweet_hash = hashlib.md5(tweet.encode()).hexdigest()
 
+            # Skip if tweet is a duplicate
             if check and check[-1] == tweet_hash:
                 logging.info(f"Skipping {bill_id} - Duplicate tweet hash")
                 continue

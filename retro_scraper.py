@@ -91,7 +91,7 @@ def RetroScraper():
                         logging.info(f"Skipping {bill_title} - Not a bill/joint resolution ({bill_type})")
                         continue
 
-                    action_date = datetime.strptime(bill.get('latestAction', {}).get('actionDate', '2024-01-01'), '%Y-%m-%d') if bill.get('latestAction') else cutoff_date
+                    action_date = datetime.strptime(bill.get('latestAction', {}).get('actionDate', '2024-01-01'), '%Y-%-m-%d') if bill.get('latestAction') else cutoff_date
                     if action_date < cutoff_date:
                         logging.info(f"Skipping {bill_type.upper()}.{number} - Too old (action date: {action_date})")
                         continue
@@ -119,6 +119,12 @@ def RetroScraper():
                         logging.info(f"Skipping {bill_id} - Idle")
                         continue
 
+                    # Add validate_tweet_data check
+                    if not utils.validate_tweet_data(bill_data):
+                        logging.warning(f"Bill {bill_id} has incomplete data, marking for retry.")
+                        utils.add_skipped_bill(congress, bill_type, bill_number, "Incomplete data")
+                        continue
+
                     template_name = utils.get_template(bill_data)
                     logging.info(f"{bill_id} - Template chosen: {template_name}")
                     if bill_data['text']:
@@ -129,8 +135,11 @@ def RetroScraper():
                             bill_data['summary'] = None
                             template_name = "no_text_available.txt"
                     
-                    # Process tweet with hashtags in utils.process_template
-                    hashtags = " ".join(utils.get_hashtags(bill_data['text'] or bill_data['crs_summary'] or '', bill_data['sponsor_party_state'].split('-')[1]))
+                    # Generate hashtags, including party hashtag
+                    state = bill_data['sponsor_party_state'].split('-')[1] if '-' in bill_data['sponsor_party_state'] else ''
+                    party_hashtag = utils.get_party_hashtag(bill_data['sponsor_party_state'])
+                    gemini_hashtags = utils.get_hashtags(bill_data['text'] or bill_data['crs_summary'] or '', state)
+                    hashtags = gemini_hashtags + " " + party_hashtag
                     tweet = utils.process_template(utils.load_tweet_template(template_name), bill_data, hashtags=hashtags)
                     tweet_hash = hashlib.md5(tweet.encode()).hexdigest()
 
