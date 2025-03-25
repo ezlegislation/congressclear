@@ -91,7 +91,7 @@ def RetroScraper():
                         logging.info(f"Skipping {bill_title} - Not a bill/joint resolution ({bill_type})")
                         continue
 
-                    action_date = datetime.strptime(bill.get('latestAction', {}).get('actionDate', '2024-01-01'), '%Y-%-m-%d') if bill.get('latestAction') else cutoff_date
+                    action_date = datetime.strptime(bill.get('latestAction', {}).get('actionDate', '2024-01-01'), '%Y-%m-%d') if bill.get('latestAction') else cutoff_date
                     if action_date < cutoff_date:
                         logging.info(f"Skipping {bill_type.upper()}.{number} - Too old (action date: {action_date})")
                         continue
@@ -125,16 +125,24 @@ def RetroScraper():
                         utils.add_skipped_bill(congress, bill_type, bill_number, "Incomplete data")
                         continue
 
-                    template_name = utils.get_template(bill_data)
-                    logging.info(f"{bill_id} - Template chosen: {template_name}")
-                    if bill_data['text']:
+                    # Template selection logic
+                    if bill_data.get('text'):
+                        # If text exists, attempt summarization and use the status-based template
                         summary = utils.summarize_text(bill_data['text'], bill_data['title'], bill_data['status'], congress, bill_type, bill_number)
                         if summary:
                             bill_data['summary'] = utils.clean_summary(summary)
+                            template_name = utils.get_template(bill_data)  # Use status-based template
+                            logging.info(f"{bill_id} - Text available and summarized, using {template_name}")
                         else:
                             bill_data['summary'] = None
-                            template_name = "no_text_available.txt"
-                    
+                            template_name = "no_text_available.txt"  # Fallback if summarization fails
+                            logging.info(f"{bill_id} - Text available but summarization failed, using no_text_available.txt")
+                    else:
+                        # If no text, use no_text_available.txt
+                        bill_data['summary'] = None
+                        template_name = "no_text_available.txt"
+                        logging.info(f"{bill_id} - No text available, using no_text_available.txt")
+
                     # Generate hashtags, including party hashtag
                     state = bill_data['sponsor_party_state'].split('-')[1] if '-' in bill_data['sponsor_party_state'] else ''
                     party_hashtag = utils.get_party_hashtag(bill_data['sponsor_party_state'])
@@ -155,9 +163,9 @@ def RetroScraper():
                         bill_data['post_id'] = str(tweet_response.data['id'])
                         # Filter post_ids to summary tweets only
                         post_ids = json.loads(check[5]) if check and check[5] else []
-                        if template_name in ["new_bill.txt"]:
+                        if template_name in ["new_bill.txt", "no_text_available.txt"]:
                             post_ids.append({"id": str(tweet_response.data['id']), "timestamp": datetime.now().isoformat()})
-                            bill_data['summary_post_id'] = str(tweet_response.data['id'])
+                            bill_data['summary_post contund_id'] = str(tweet_response.data['id'])
                         bill_data['post_ids'] = post_ids
                         bill_data['tweet_hash'] = tweet_hash
                         utils.save_bill(bill_data)
