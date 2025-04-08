@@ -526,34 +526,37 @@ def process_template(template, data, hashtags=None):
 
 def summarize_text(text, bill_title, status, congress, bill_type, number):
     """Summarize the bill text using Gemini AI with retries and validation."""
+    logging.info(f"Starting summarize_text for {bill_type.upper()}.{number}")
     if not text or len(text) < 30:
         logging.info(f"No summary for {bill_type.upper()}.{number}: Text too short or empty")
-        return "Summary unavailable due to insufficient data"
-    
-    prompt_template = load_prompt('summarize.txt')
-    prompt = prompt_template.format(bill_title=bill_title, bill_text=text)
-    last_summary = None
+        return f"Bill: {bill_title} ({status}) - No summary available due to insufficient text data."
+    logging.info(f"Text length for {bill_type.upper()}.{number}: {len(text)} characters")
+    try:
+        prompt_template = load_prompt('summarize.txt')
+        logging.info(f"Prompt template loaded: {prompt_template}")
+        prompt = prompt_template.format(bill_title=bill_title, bill_text=text[:4000])
+        logging.info(f"Prompt formatted for {bill_type.upper()}.{number}: {prompt[:100]}...")
+    except Exception as e:
+        logging.error(f"Prompt setup failed for {bill_type.upper()}.{number}: {str(e)}")
+        return f"Bill: {bill_title} ({status}) - Prompt setup failed: {str(e)}"
     
     for attempt in range(5):
         try:
             logging.info(f"Attempting summary generation for {bill_type.upper()}.{number}, attempt {attempt + 1}")
             model = genai.GenerativeModel('gemini-1.5-flash')
             summary = model.generate_content(prompt).text.strip()
-            logging.info(f"Raw AI summary: {repr(summary)}")
-            last_summary = summary
-            if validate_summary(summary):
+            logging.info(f"Gemini summary for {bill_type.upper()}.{number}: {repr(summary)}")
+            if summary and validate_summary(summary):
+                logging.info(f"Summary validated for {bill_type.upper()}.{number}")
                 return summary
-            logging.info(f"Summary validation failed, retrying attempt {attempt + 1}")
+            logging.warning(f"Summary invalid or empty for {bill_type.upper()}.{number}: {repr(summary)}, retrying attempt {attempt + 1}")
             time.sleep(30)
         except Exception as e:
             logging.error(f"Summary attempt {attempt + 1} failed for {bill_type.upper()}.{number}: {str(e)}")
             time.sleep(30)
     
-    send_email(
-        f"Summary Failure: {bill_title} ({congress}/{bill_type}/{number})",
-        f"Bill: {bill_type.upper()}.{number}\nText Sample: {text[:100]}...\nLast Summary: {last_summary}\nError: 5 attempts failed"
-    )
-    return "Summary unavailable due to insufficient data"
+    logging.warning(f"All attempts failed for {bill_type.upper()}.{number}, using fallback")
+    return f"Bill: {bill_title} ({status}) - Summary generation failed after 5 attempts."
 
 def validate_summary(summary):
     """Validate the summary for quality using Gemini."""

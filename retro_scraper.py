@@ -18,8 +18,83 @@ retro_start_file = "/home/srrdx9mw12tk/congressclear/retro_start.txt"
 progress_file = "/home/srrdx9mw12tk/congressclear/retro_progress.txt"
 
 def RetroScraper():
-    utils.init_db()
-    skipped_results = utils.retry_skipped_bills()
+      logging.info("Initializing database")
+      utils.init_db()
+      logging.info("Starting retry_skipped_bills")
+      skipped_results = utils.retry_skipped_bills()
+      logging.info(f"Retry results: {len(skipped_results)} bills to process")
+      for bill_data in skipped_results:
+          congress = bill_data['congress']
+          bill_type = bill_data['bill_type']
+          bill_number = bill_data['number']
+          bill_id = f"{bill_type.upper()}.{bill_number}"
+          logging.info(f"Processing retried bill: {bill_id} - {bill_data['title']}")
+          check = utils.check_bill(bill_data['title'], bill_data['status'])
+          tweeted = check[0] if check else 0
+          old_text_hash = check[1] if check else None
+          old_actions = json.loads(check[2]) if check and check[2] else []
+          text_hash = bill_data['text_hash']
+
+          logging.info(f"{bill_id} - Tweeted from check: {tweeted}, Bill data tweeted: {bill_data.get('tweeted')}")
+
+          if tweeted and old_text_hash == text_hash and sorted(old_actions, key=lambda x: x['actionDate']) == sorted(bill_data['actions'], key=lambda x: x['actionDate']):
+              logging.info(f"Skipping {bill_id} - No changes")
+              continue
+
+          if bill_data.get('text'):
+              summary = utils.summarize_text(bill_data['text'], bill_data['title'], bill_data['status'], congress, bill_type, bill_number)
+              if summary:
+                  bill_data['summary'] = utils.clean_summary(summary)
+                  template_name = utils.get_template(bill_data)
+                  logging.info(f"{bill_id} - Text available and summarized, using {template_name}")
+              else:
+                  bill_data['summary'] = None
+                  template_name = "no_text_available.txt"
+                  logging.info(f"{bill_id} - Text available but summarization failed, using no_text_available.txt")
+          else:
+              bill_data['summary'] = None
+              template_name = "no_text_available.txt"
+              logging.info(f"{bill_id} - No text available, using no_text_available.txt")
+
+          if not utils.validate_tweet_data(bill_data):
+              logging.warning(f"Bill {bill_id} has incomplete data, marking for retry.")
+              utils.add_skipped_bill(congress, bill_type, bill_number, "Incomplete data")
+              continue
+
+          state = bill_data['sponsor_party_state'].split('-')[1] if '-' in bill_data['sponsor_party_state'] else ''
+          party_hashtag = utils.get_party_hashtag(bill_data['sponsor_party_state'])
+          gemini_hashtags = utils.get_hashtags(bill_data['text'] or bill_data['crs_summary'] or '', state)
+          hashtags = gemini_hashtags + " " + party_hashtag
+          tweet = utils.process_template(utils.load_tweet_template(template_name), bill_data, hashtags=hashtags)
+          tweet_hash = hashlib.md5(tweet.encode()).hexdigest()
+
+          if check and check[-1] == tweet_hash:
+              logging.info(f"Skipping {bill_id} - Duplicate tweet hash")
+              continue
+
+          try:
+              logging.info(f"Tweet before posting: {repr(tweet)}")
+              tweet_response = client.create_tweet(text=tweet)
+              tweeted_count += 1
+              bill_data['tweeted'] = 1
+              bill_data['post_id'] = str(tweet_response.data['id'])
+              post_ids = json.loads(check[5]) if check and check[5] else []
+              if template_name in ["new_bill.txt", "no_text_available.txt"]:
+                  post_ids.append({"id": str(tweet_response.data['id']), "timestamp": datetime.now().isoformat()})
+                  bill_data['summary_post_id'] = str(tweet_response.data['id'])
+              bill_data['post_ids'] = post_ids
+              bill_data['tweet_hash'] = tweet_hash
+              utils.save_bill(bill_data)
+              logging.info(f"Tweeted {bill_id}: {tweet[:100]}... - ID: {tweet_response.data['id']}")
+              utils.save_tweet_count(tweeted_count, last_reset)
+              sleep_time = 1800 if datetime.now() < datetime(2025, 3, 23) else 3600
+              time.sleep(sleep_time)
+          except tweepy.TweepyException as e:
+              logging.error(f"Tweet error for {bill_id}: {e}")
+              if "429" in str(e):
+                  tweeted_count, last_reset = utils.handle_rate_limit(tweeted_count, last_reset, daily_limit)
+              else:
+                  time.sleep(60)
     
     try:
         with open(retro_start_file, 'r') as f:
